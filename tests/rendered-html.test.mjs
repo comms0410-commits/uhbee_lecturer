@@ -41,6 +41,7 @@ test("ships persistence, migrations, and a branded social card", async () => {
   await access(new URL("../drizzle/0000_bent_silver_surfer.sql", import.meta.url));
   await access(new URL("../drizzle/0001_wise_havok.sql", import.meta.url));
   await access(new URL("../drizzle/0002_outstanding_doorman.sql", import.meta.url));
+  await access(new URL("../drizzle/0003_tiny_korvac.sql", import.meta.url));
   await access(new URL("../app/api/admin/route.ts", import.meta.url));
   await access(new URL("../app/api/admin/login/route.ts", import.meta.url));
   await access(new URL("../app/api/resources/[id]/route.ts", import.meta.url));

@@ -75,6 +75,11 @@ export async function ensureCoreSchema() {
       FOREIGN KEY (target_email) REFERENCES users(email),
       FOREIGN KEY (created_by) REFERENCES users(email)
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS admin_login_attempts (
+      id TEXT PRIMARY KEY NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      window_started_at INTEGER NOT NULL
+    )`),
     db.prepare("CREATE INDEX IF NOT EXISTS onboarding_tasks_user_idx ON onboarding_tasks (user_email, sort_order)"),
     db.prepare("CREATE INDEX IF NOT EXISTS student_issues_user_idx ON student_issues (user_email, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS instructor_resources_target_idx ON instructor_resources (target_email, created_at)")

@@ -67,3 +67,9 @@ export const instructorResources = sqliteTable("instructor_resources", {
   createdBy: text("created_by").notNull().references(() => users.email),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("instructor_resources_target_idx").on(table.targetEmail, table.createdAt)]);
+
+export const adminLoginAttempts = sqliteTable("admin_login_attempts", {
+  id: text("id").primaryKey(),
+  attempts: integer("attempts").notNull().default(0),
+  windowStartedAt: integer("window_started_at").notNull(),
+});
