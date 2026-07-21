@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { chatGPTSignInPath, getChatGPTUser } from "../chatgpt-auth";
+import { siteDisplayName } from "../display-name";
 import { AdminPortal } from "./AdminPortal";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export default async function AdminPage() {
   return (
     <AdminPortal
       initialUser={{
-        displayName: signedInUser?.displayName ?? "김어비",
+        displayName: siteDisplayName(signedInUser?.displayName ?? "김어비"),
         email: signedInUser?.email ?? "demo@localhost",
       }}
     />

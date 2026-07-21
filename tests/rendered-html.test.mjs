@@ -3,11 +3,12 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("defines the complete UhB instructor center", async () => {
-  const [app, page, layout, admin] = await Promise.all([
+  const [app, page, layout, admin, displayName] = await Promise.all([
     readFile(new URL("../app/OnboardingApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/AdminPortal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/display-name.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(layout, /title: "어비 강사 온보딩 센터"/);
@@ -18,6 +19,8 @@ test("defines the complete UhB instructor center", async () => {
   assert.match(app, /관리자 페이지/);
   assert.match(admin, /신규 강사 등록/);
   assert.match(admin, /파일·링크 전달/);
+  assert.match(displayName, /홍길동/);
+  assert.match(page, /siteDisplayName/);
   assert.doesNotMatch(`${app}${page}${layout}${admin}`, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 

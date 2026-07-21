@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { siteDisplayName } from "./display-name";
 
 type TaskStatus = "not_started" | "in_progress" | "review" | "revision" | "done";
 type Section = "home" | "roadmap" | "planner" | "operations" | "zoom" | "coach" | "crisis" | "library" | "support";
@@ -79,7 +80,7 @@ const statusMeta: Record<TaskStatus, { label: string; tone: string }> = {
 const planSteps = ["강의 기본 정보", "수강생 이해", "강의 목표", "회차별 커리큘럼", "무료강의 설계", "운영 설계", "수강생 지원", "표현·운영 점검"];
 
 function displayFirstName(name: string) {
-  const trimmed = name.trim();
+  const trimmed = siteDisplayName(name).trim();
   if (!trimmed) return "강사";
   return trimmed.includes("@") ? "강사" : trimmed.split(" ")[0];
 }

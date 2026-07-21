@@ -1,4 +1,5 @@
 import { ensureCoreSchema } from "@/db/runtime";
+import { siteDisplayName } from "@/app/display-name";
 
 export type Role = "instructor" | "admin" | "superadmin";
 
@@ -21,7 +22,7 @@ export function requestIdentity(request: Request) {
     if (encodedName && encoding === "percent-encoded-utf-8") {
       try { displayName = decodeURIComponent(encodedName); } catch { displayName = email; }
     }
-    return { email: email.trim().toLowerCase(), displayName };
+    return { email: email.trim().toLowerCase(), displayName: siteDisplayName(displayName) };
   }
 
   const host = new URL(request.url).hostname;

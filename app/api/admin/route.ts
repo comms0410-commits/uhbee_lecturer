@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { siteDisplayName } from "@/app/display-name";
 import { requireAdmin, seedInstructor } from "../session";
 
 export const dynamic = "force-dynamic";
@@ -49,8 +50,8 @@ export async function GET(request: Request) {
 
     return Response.json({
       user: { email: user.email, displayName: user.display_name, role: user.role },
-      instructors: instructors.results,
-      resources: resources.results,
+      instructors: instructors.results.map((item) => ({ ...item, display_name: siteDisplayName(String(item.display_name ?? "")) })),
+      resources: resources.results.map((item) => ({ ...item, target_name: siteDisplayName(String(item.target_name ?? "")) })),
     });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "관리자 데이터를 불러오지 못했습니다." }, { status: 500 });
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
         return Response.json({ error: "지원하지 않는 요청입니다." }, { status: 400 });
       }
 
-      const displayName = String(body.displayName ?? "").trim();
+      const displayName = siteDisplayName(String(body.displayName ?? "").trim());
       const email = String(body.email ?? "").trim().toLowerCase();
       const specialty = String(body.specialty ?? "").trim() || "전문 분야 등록 전";
       const grade = String(body.grade ?? "").trim() || "연습강사";
