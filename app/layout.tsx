@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "어비 강사 온보딩 센터",
       description: "계약부터 첫 강의, 수강생 관리까지 한 번에",
       url: origin,
-      siteName: "UBII",
+      siteName: "UhB",
       locale: "ko_KR",
       type: "website",
       images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: "어비 강사 온보딩 센터" }],

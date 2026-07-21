@@ -14,7 +14,7 @@ export default async function Home() {
     return (
       <main className="signin-shell">
         <section className="signin-card" aria-labelledby="signin-title">
-          <div className="brand-mark">UBII</div>
+          <div className="brand-mark">UhB</div>
           <span className="eyebrow">강사 운영 내비게이션</span>
           <h1 id="signin-title">계약부터 첫 강의까지,<br />한 흐름으로 준비하세요.</h1>
           <p>내 진행 단계와 필수 체크리스트, 기획안 검토와 위기 대응을 한곳에서 관리합니다.</p>

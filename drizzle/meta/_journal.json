@@ -15,6 +15,13 @@
       "when": 1784643319543,
       "tag": "0001_wise_havok",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784645532854,
+      "tag": "0002_outstanding_doorman",
+      "breakpoints": true
     }
   ]
 }

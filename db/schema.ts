@@ -51,3 +51,19 @@ export const studentIssues = sqliteTable("student_issues", {
   status: text("status", { enum: ["reported", "reviewing", "resolved"] }).notNull().default("reported"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("student_issues_user_idx").on(table.userEmail, table.createdAt)]);
+
+export const instructorResources = sqliteTable("instructor_resources", {
+  id: text("id").primaryKey(),
+  targetEmail: text("target_email").notNull().references(() => users.email),
+  title: text("title").notNull(),
+  resourceType: text("resource_type").notNull().default("전자책"),
+  requestNote: text("request_note").notNull().default(""),
+  deliveryType: text("delivery_type", { enum: ["link", "file"] }).notNull(),
+  externalUrl: text("external_url"),
+  objectKey: text("object_key"),
+  fileName: text("file_name"),
+  mimeType: text("mime_type"),
+  sizeBytes: integer("size_bytes"),
+  createdBy: text("created_by").notNull().references(() => users.email),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("instructor_resources_target_idx").on(table.targetEmail, table.createdAt)]);

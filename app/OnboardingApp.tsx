@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 type TaskStatus = "not_started" | "in_progress" | "review" | "revision" | "done";
-type Section = "home" | "roadmap" | "planner" | "operations" | "zoom" | "coach" | "crisis" | "library" | "support" | "admin";
+type Section = "home" | "roadmap" | "planner" | "operations" | "zoom" | "coach" | "crisis" | "library" | "support";
 
 type Task = {
   id: string;
@@ -15,12 +15,26 @@ type Task = {
   sort_order: number;
 };
 
+type DeliveredResource = {
+  id: string;
+  title: string;
+  resource_type: string;
+  request_note: string;
+  delivery_type: "link" | "file";
+  external_url: string | null;
+  file_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+};
+
 type Workspace = {
   user: { email: string; displayName: string; role: "instructor" | "admin" | "superadmin" };
   profile: { grade: string; contract_status: string; settlement_rate: number; specialty: string; manager_name: string; manager_email: string };
   tasks: Task[];
   plan: { content: Record<string, string>; status: string; version: number; reviewerComment: string | null; updatedAt: string | null };
   issues: Array<{ id: string; severity: number; category: string; course_name: string; status: string; created_at: string }>;
+  resources: DeliveredResource[];
 };
 
 const navItems: Array<{ id: Section; label: string; code: string }> = [
@@ -51,6 +65,7 @@ const emptyWorkspace = (name: string, email: string): Workspace => ({
   tasks: defaultTasks,
   plan: { content: {}, status: "draft", version: 1, reviewerComment: "성과 표현의 근거와 실습 완료 기준을 조금 더 구체적으로 적어 주세요.", updatedAt: null },
   issues: [],
+  resources: [],
 });
 
 const statusMeta: Record<TaskStatus, { label: string; tone: string }> = {
@@ -72,7 +87,6 @@ function displayFirstName(name: string) {
 export function OnboardingApp({ initialUser }: { initialUser: { displayName: string; email: string } }) {
   const [workspace, setWorkspace] = useState<Workspace>(() => emptyWorkspace(initialUser.displayName, initialUser.email));
   const [active, setActive] = useState<Section>("home");
-  const [viewAs, setViewAs] = useState<"instructor" | "admin">("instructor");
   const [syncState, setSyncState] = useState<"loading" | "ready" | "offline">("loading");
   const [toast, setToast] = useState("");
 
@@ -126,7 +140,7 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
     <div className="app-shell">
       <aside className="sidebar">
         <button className="wordmark" onClick={() => moveTo("home")} aria-label="어비 강사 센터 홈">
-          <span className="wordmark-main">UBII</span><span className="wordmark-sub">INSTRUCTOR CENTER</span>
+          <span className="wordmark-main">UhB</span><span className="wordmark-sub">INSTRUCTOR CENTER</span>
         </button>
         <div className="profile-mini">
           <div className="avatar">{displayFirstName(workspace.user.displayName).slice(0, 1)}</div>
@@ -135,7 +149,7 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
         <nav aria-label="주요 메뉴">
           <p className="nav-label">강사 가이드</p>
           {navItems.map((item) => (
-            <button key={item.id} className={`nav-item ${active === item.id && viewAs === "instructor" ? "active" : ""}`} onClick={() => { setViewAs("instructor"); moveTo(item.id); }}>
+            <button key={item.id} className={`nav-item ${active === item.id ? "active" : ""}`} onClick={() => moveTo(item.id)}>
               <span className="nav-code">{item.code}</span><span>{item.label}</span>
               {item.id === "crisis" && <span className="nav-alert">!</span>}
             </button>
@@ -143,9 +157,7 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
           {canManage && (
             <>
               <p className="nav-label nav-label-admin">운영 관리</p>
-              <button className={`nav-item ${viewAs === "admin" ? "active" : ""}`} onClick={() => { setViewAs("admin"); setActive("admin"); }}>
-                <span className="nav-code">A</span><span>관리자 운영 현황</span><span className="nav-count">4</span>
-              </button>
+              <a className="nav-item" href="/admin"><span className="nav-code">A</span><span>관리자 페이지</span><span className="nav-count">↗</span></a>
             </>
           )}
         </nav>
@@ -157,20 +169,17 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
 
       <section className="app-content">
         <header className="topbar">
-          <button className="mobile-brand" onClick={() => moveTo("home")}>UBII</button>
-          <div className="top-context"><span>{viewAs === "admin" ? "운영 관리" : "강사 가이드"}</span><strong>{viewAs === "admin" ? "전체 운영 현황" : navItems.find((item) => item.id === active)?.label}</strong></div>
+          <button className="mobile-brand" onClick={() => moveTo("home")}>UhB</button>
+          <div className="top-context"><span>강사 가이드</span><strong>{navItems.find((item) => item.id === active)?.label}</strong></div>
           <div className="top-actions">
-            {canManage && <div className="view-switch" aria-label="화면 전환"><button className={viewAs === "instructor" ? "selected" : ""} onClick={() => { setViewAs("instructor"); setActive("home"); }}>강사 화면</button><button className={viewAs === "admin" ? "selected" : ""} onClick={() => { setViewAs("admin"); setActive("admin"); }}>관리자 화면</button></div>}
+            {canManage && <div className="view-switch" aria-label="화면 전환"><button className="selected" onClick={() => setActive("home")}>강사 화면</button><a href="/admin">관리자 페이지</a></div>}
             <button className="icon-button" aria-label="알림 3개"><span className="bell-shape" aria-hidden="true" /><b>3</b></button>
             <a className="user-pill" href="/signout-with-chatgpt?return_to=%2F" title="로그아웃"><span>{displayFirstName(workspace.user.displayName).slice(0, 1)}</span><strong>{displayFirstName(workspace.user.displayName)}</strong></a>
           </div>
         </header>
 
         <main className="main-stage">
-          {viewAs === "admin" ? (
-            <AdminDashboard onOpenInstructor={() => { setViewAs("instructor"); setActive("home"); }} />
-          ) : (
-            <>
+          <>
               {active === "home" && <HomeDashboard workspace={workspace} progress={progress} nextTask={nextTask} onToggle={toggleTask} onMove={moveTo} />}
               {active === "roadmap" && <Roadmap tasks={workspace.tasks} onToggle={toggleTask} />}
               {active === "planner" && <Planner workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}
@@ -178,14 +187,13 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
               {active === "zoom" && <ZoomGuide notify={setToast} />}
               {active === "coach" && <CoachGuide notify={setToast} />}
               {active === "crisis" && <CrisisCenter workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}
-              {active === "library" && <Library notify={setToast} />}
+              {active === "library" && <Library resources={workspace.resources} notify={setToast} />}
               {active === "support" && <Support notify={setToast} />}
-            </>
-          )}
+          </>
         </main>
 
         <nav className="mobile-nav" aria-label="모바일 빠른 메뉴">
-          {[navItems[0], navItems[1], navItems[2], navItems[6], navItems[7]].map((item) => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => { setViewAs("instructor"); moveTo(item.id); }}><span>{item.code}</span>{item.label.replace("강사 ", "").replace("·수강생", "")}</button>)}
+          {[navItems[0], navItems[1], navItems[2], navItems[6], navItems[7]].map((item) => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => moveTo(item.id)}><span>{item.code}</span>{item.label.replace("강사 ", "").replace("·수강생", "")}</button>)}
         </nav>
       </section>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
@@ -309,7 +317,7 @@ function ZoomGuide({ notify }: { notify: (message: string) => void }) {
   const [open, setOpen] = useState(0);
   const faq = [{ q: "소리가 들리지 않아요", a: "마이크 입력 장치와 컴퓨터 소리 공유를 확인합니다. 해결되지 않으면 채팅으로 재접속 링크를 안내하고 공동호스트에게 진행을 맡깁니다." }, { q: "화면 공유가 되지 않아요", a: "호스트의 화면 공유 권한과 운영체제 권한을 확인합니다. 즉시 해결이 어렵다면 자료 링크를 채팅과 코치방에 공유합니다." }, { q: "수강생이 입장하지 못해요", a: "회의 ID·암호·대기실 승인 여부를 확인합니다. 5분 이상 지속되면 관리자에게 참석자 정보와 증상을 전달합니다." }, { q: "녹화 제공 문의가 있어요", a: "사전에 고지한 녹화 정책과 개인정보 동의 범위를 확인한 뒤 동일한 기준으로 안내합니다." }];
   return <div className="page"><PageHeading eyebrow="ZOOM PLAYBOOK" title="Zoom 리허설, 화면 순서대로 따라하세요" description="강의 시작 20분 전부터 종료 안내까지 실제 운영 순서로 정리했습니다." action={<span className="date-pill">다음 리허설 · 7월 23일 15:00</span>} />
-    <section className="zoom-hero"><div><span>20 MIN BEFORE</span><h2>리허설 방에 먼저 입장해<br />장비와 권한을 확인하세요.</h2><p>공동호스트와 입장·화면공유·채팅 권한을 한 번씩 실행하면 대부분의 현장 문제를 예방할 수 있어요.</p><button className="light-button" onClick={() => notify("리허설 체크를 시작했어요.")}>리허설 체크 시작 →</button></div><div className="zoom-window" aria-hidden="true"><div className="window-bar"><i /><i /><i /><span>UBII · 강의 리허설</span></div><div className="speaker-box"><span>UBII</span><strong>카메라 프레임</strong></div><div className="window-controls"><span>MIC</span><span>CAM</span><span>SHARE</span><b>END</b></div></div></section>
+    <section className="zoom-hero"><div><span>20 MIN BEFORE</span><h2>리허설 방에 먼저 입장해<br />장비와 권한을 확인하세요.</h2><p>공동호스트와 입장·화면공유·채팅 권한을 한 번씩 실행하면 대부분의 현장 문제를 예방할 수 있어요.</p><button className="light-button" onClick={() => notify("리허설 체크를 시작했어요.")}>리허설 체크 시작 →</button></div><div className="zoom-window" aria-hidden="true"><div className="window-bar"><i /><i /><i /><span>UhB · 강의 리허설</span></div><div className="speaker-box"><span>UhB</span><strong>카메라 프레임</strong></div><div className="window-controls"><span>MIC</span><span>CAM</span><span>SHARE</span><b>END</b></div></div></section>
     <div className="guide-columns"><section><span className="section-index">01 · 준비</span><h2>강사 준비 체크리스트</h2>{["Zoom 계정과 최신 앱", "회의명·대기실·암호", "호스트·공동호스트 권한", "화면·컴퓨터 소리 공유", "카메라·마이크·조명", "채팅·녹화·이름 정책"].map((item, index) => <div className="number-check" key={item}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item}</strong><i>확인</i></div>)}</section><section><span className="section-index">02 · 운영</span><h2>수업 운영 절차</h2><ol className="vertical-steps">{["15~20분 전 입장 및 장비 점검", "공동호스트와 권한 리허설", "입장 시 이름·음소거·질문 안내", "자료 공유와 실습 전환 확인", "문제 시 대체 링크 즉시 공지", "종료 전 다음 회차·과제 안내"].map((item, index) => <li key={item}><span>{index + 1}</span><div><strong>{item}</strong><small>{index === 4 ? "채팅과 코치방 모두 공지" : "완료 후 다음 단계로 이동"}</small></div></li>)}</ol></section></div>
     <section className="faq-section"><div className="section-title"><span className="section-index">03 · 문제 해결</span><h2>자주 발생하는 상황</h2></div>{faq.map((item, index) => <div className={`faq-row ${open === index ? "open" : ""}`} key={item.q}><button onClick={() => setOpen(open === index ? -1 : index)}><span>0{index + 1}</span><strong>{item.q}</strong><b>{open === index ? "−" : "+"}</b></button>{open === index && <div><p>{item.a}</p><button onClick={() => notify("수강생 안내 문구를 복사했어요.")}>안내 문구 복사</button></div>}</div>)}</section>
   </div>;
@@ -320,7 +328,7 @@ function CoachGuide({ notify }: { notify: (message: string) => void }) {
   const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); notify("표준 문구를 복사했어요."); } catch { notify("문구를 선택해 복사해 주세요."); } };
   return <div className="page"><PageHeading eyebrow="COACH ROOM" title="코치방 개설부터 종강까지" description="카카오 오픈채팅 개설 순서와 수강생 운영 기준을 한 화면에서 확인하세요." />
     <section className="coach-intro"><div><span>8 STEPS</span><h2>약 10분이면<br />표준 코치방을 만들 수 있어요.</h2><p>방 이름과 설명, 참여 코드, 고정 공지를 먼저 준비해 두면 더 빠릅니다.</p></div><div className="coach-rule"><span>권장 인원</span><strong>60–70명</strong><small>강의 성격에 따라 관리자와 조정</small></div></section>
-    <div className="coach-layout"><section className="phone-steps"><div className="mock-phone"><div className="phone-top"><span>9:41</span><b>● ●</b></div><div className="chat-preview"><i>UBII</i><strong>[AI 실무 1기] 김어비_코칭방</strong><span>질문 가능 시간 · 평일 10:00–18:00</span><div className="chat-note">공지 · Zoom 링크와 과제 제출 양식을 확인해 주세요.</div></div></div><div className="steps-grid">{steps.map((item, index) => <button key={item} onClick={() => notify(`${index + 1}단계 완료로 표시했어요.`)}><span>{index + 1}</span><strong>{item}</strong><i>체크</i></button>)}</div></section>
+    <div className="coach-layout"><section className="phone-steps"><div className="mock-phone"><div className="phone-top"><span>9:41</span><b>● ●</b></div><div className="chat-preview"><i>UhB</i><strong>[AI 실무 1기] 김어비_코칭방</strong><span>질문 가능 시간 · 평일 10:00–18:00</span><div className="chat-note">공지 · Zoom 링크와 과제 제출 양식을 확인해 주세요.</div></div></div><div className="steps-grid">{steps.map((item, index) => <button key={item} onClick={() => notify(`${index + 1}단계 완료로 표시했어요.`)}><span>{index + 1}</span><strong>{item}</strong><i>체크</i></button>)}</div></section>
       <aside className="coach-copy"><h2>표준 설정</h2>{[{ label: "방 이름", text: "[AI 실무 1기] 김어비_코칭방" }, { label: "방 설명", text: "운영 기간과 질문 가능 시간을 확인해 주세요. 개인 연락처·광고·비방은 금지합니다." }, { label: "고정 공지", text: "Zoom 링크 / 일정 / 질문 양식 / 자료 안내 / 운영 규칙" }].map((item) => <div className="copy-box" key={item.label}><span>{item.label}</span><p>{item.text}</p><button onClick={() => copy(item.text)}>복사</button></div>)}<div className="rule-list"><h3>운영 원칙</h3><p>응답 가능 시간과 예상 시간을 미리 공지</p><p>민감정보는 공개방에 남기지 않기</p><p>비방·도배·저작권 침해는 기록 후 이관</p><p>종강 후 유지·자료 보관 기간 공지</p></div></aside></div>
   </div>;
 }
@@ -338,11 +346,12 @@ function CrisisCenter({ workspace, setWorkspace, apiPatch, notify }: { workspace
   </div>;
 }
 
-function Library({ notify }: { notify: (message: string) => void }) {
+function Library({ resources: deliveredResources, notify }: { resources: DeliveredResource[]; notify: (message: string) => void }) {
   const resources = [{ type: "기획안", title: "무료강의 기획안 기본 양식", meta: "DOCX · 2026.07.18 업데이트" }, { type: "운영", title: "강의 전·중·후 체크리스트", meta: "PDF · 2026.07.20 업데이트" }, { type: "Zoom", title: "Zoom 리허설 확인표", meta: "PDF · 2026.07.12 업데이트" }, { type: "코치방", title: "코치방 고정 공지 템플릿", meta: "DOCX · 2026.07.16 업데이트" }, { type: "위기대응", title: "민원·위기 이슈 신고 양식", meta: "DOCX · 2026.07.21 업데이트" }, { type: "브랜드", title: "어비 강의 자료 디자인 가이드", meta: "PDF · 2026.06.30 업데이트" }];
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => resources.filter((resource) => `${resource.type} ${resource.title}`.includes(query)), [query]);
   return <div className="page"><PageHeading eyebrow="RESOURCE LIBRARY" title="필요한 양식과 자료를 바로 찾으세요" description="강의 준비와 운영에 사용하는 최신 공식 자료만 모았습니다." />
+    {deliveredResources.length > 0 && <section className="delivered-resources"><div className="delivered-head"><div><span>FOR YOU</span><h2>관리자가 전달한 요청 자료</h2></div><strong>{deliveredResources.length}건</strong></div><div>{deliveredResources.map((resource) => <article key={resource.id}><span className={`delivery-icon ${resource.delivery_type}`}>{resource.delivery_type === "file" ? "F" : "↗"}</span><div><em>{resource.resource_type}</em><h3>{resource.title}</h3><p>{resource.request_note || (resource.delivery_type === "file" ? resource.file_name : "외부 링크로 전달된 자료입니다.")}</p></div><a href={`/api/resources/${resource.id}`} target="_blank" rel="noreferrer">{resource.delivery_type === "file" ? "다운로드" : "링크 열기"} <span>→</span></a></article>)}</div></section>}
     <div className="library-toolbar"><label><span aria-hidden="true">⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="자료명 또는 카테고리 검색" /></label><div>{["전체", "기획안", "운영", "Zoom", "코치방", "위기대응"].map((item) => <button key={item} onClick={() => setQuery(item === "전체" ? "" : item)}>{item}</button>)}</div></div>
     <div className="resource-grid">{filtered.map((resource, index) => <article key={resource.title}><div className={`file-cover cover-${index % 4}`}><span>{resource.type}</span><strong>{resource.title.split(" ").slice(0, 2).join(" ")}</strong><b>{resource.meta.startsWith("DOCX") ? "D" : "P"}</b></div><span className="resource-type">{resource.type}</span><h2>{resource.title}</h2><p>{resource.meta}</p><button onClick={() => notify(`${resource.title} 다운로드를 준비했어요.`)}>다운로드 <span>↓</span></button></article>)}</div>
   </div>;
@@ -351,15 +360,5 @@ function Library({ notify }: { notify: (message: string) => void }) {
 function Support({ notify }: { notify: (message: string) => void }) {
   return <div className="page"><PageHeading eyebrow="HELP DESK" title="어떤 도움이 필요하신가요?" description="일반 문의는 담당 관리자에게, 긴급한 수강생 이슈는 위기대응 센터로 접수해 주세요." />
     <div className="support-grid"><section className="panel"><span className="section-index">MY MANAGER</span><h2>이수민 매니저</h2><p>기획안 검토, 리허설 일정, 강의 준비 상태를 함께 확인합니다.</p><a className="primary-button" href="mailto:support@ubii.co.kr">이메일 보내기</a><small>평일 10:00–18:00 · 평균 3시간 내 답변</small></section><section className="panel"><span className="section-index">QUICK REQUEST</span><h2>지원 요청 남기기</h2><label><span>문의 유형</span><select><option>기획안·검토</option><option>강의 일정</option><option>Zoom·기술</option><option>계약·정산</option></select></label><label><span>문의 내용</span><textarea rows={4} placeholder="필요한 도움을 구체적으로 적어 주세요." /></label><button className="primary-button" onClick={() => notify("지원 요청을 접수했어요.")}>요청 보내기</button></section></div>
-  </div>;
-}
-
-function AdminDashboard({ onOpenInstructor }: { onOpenInstructor: () => void }) {
-  const instructors = [{ name: "김어비", field: "AI 업무자동화", grade: "연습강사", progress: 62, status: "기획안 보완" }, { name: "박소진", field: "콘텐츠 마케팅", grade: "전문강사", progress: 94, status: "본강의 준비" }, { name: "이민호", field: "스마트스토어", grade: "연습강사", progress: 48, status: "리허설 대기" }, { name: "최유진", field: "브랜딩 디자인", grade: "연습강사", progress: 71, status: "무료강의 예정" }, { name: "정하늘", field: "영상 제작", grade: "보류", progress: 36, status: "개선 과제" }];
-  return <div className="page admin-page"><PageHeading eyebrow="ADMIN OVERVIEW" title="운영 현황을 한눈에 확인하세요" description="검토가 늦어지는 지점과 위험 이슈를 먼저 확인할 수 있습니다." action={<button className="secondary-button" onClick={onOpenInstructor}>내 강사 화면 보기</button>} />
-    <div className="metric-grid">{[{ label: "전체 강사", value: "28", note: "+3 이번 달", tone: "dark" }, { label: "연습강사", value: "12", note: "43%", tone: "blue" }, { label: "검토 대기", value: "6", note: "기획안 4 · 리허설 2", tone: "orange" }, { label: "미처리 이슈", value: "2", note: "긴급 1건", tone: "red" }].map((item) => <article className={item.tone} key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.note}</small></article>)}</div>
-    <div className="admin-grid"><section className="panel instructor-table"><div className="panel-head"><div><span className="section-index">INSTRUCTORS</span><h2>담당 강사 현황</h2></div><button className="text-button">전체 보기 →</button></div><div className="table-head"><span>강사</span><span>등급</span><span>진행률</span><span>현재 상태</span><span /></div>{instructors.map((item) => <div className="table-row" key={item.name}><span className="instructor-cell"><i>{item.name[0]}</i><b>{item.name}<small>{item.field}</small></b></span><span><em>{item.grade}</em></span><span className="table-progress"><i><b style={{ width: `${item.progress}%` }} /></i>{item.progress}%</span><span>{item.status}</span><button aria-label={`${item.name} 상세 보기`}>→</button></div>)}</section>
-      <aside className="review-queue"><div className="panel-head"><div><span className="section-index">ACTION NEEDED</span><h2>오늘 확인할 일</h2></div></div>{[{ type: "기획안", title: "김어비 강사 · v1", time: "2시간 전", tone: "orange" }, { type: "리허설", title: "이민호 강사 · 보완", time: "오늘 15:00", tone: "red" }, { type: "이슈", title: "환불 문의 · 2단계", time: "32분 전", tone: "red" }, { type: "기획안", title: "최유진 강사 · v2", time: "어제", tone: "blue" }].map((item) => <button key={item.title}><span className={item.tone}>{item.type}</span><div><strong>{item.title}</strong><small>{item.time}</small></div><b>→</b></button>)}</aside></div>
-    <section className="panel stage-analytics"><div className="panel-head"><div><span className="section-index">STAGE COMPLETION</span><h2>단계별 완료율</h2></div><span className="quiet-copy">전체 강사 기준</span></div><div>{[{ name: "채널진단", value: 86 }, { name: "기획안", value: 68 }, { name: "OT", value: 61 }, { name: "리허설", value: 54 }, { name: "무료강의", value: 43 }, { name: "본강의", value: 32 }, { name: "코치방", value: 29 }].map((item) => <div key={item.name}><span>{item.name}</span><i><b style={{ width: `${item.value}%` }} /></i><strong>{item.value}%</strong></div>)}</div></section>
   </div>;
 }

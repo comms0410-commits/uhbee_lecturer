@@ -58,8 +58,26 @@ export async function ensureCoreSchema() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_email) REFERENCES users(email)
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS instructor_resources (
+      id TEXT PRIMARY KEY NOT NULL,
+      target_email TEXT NOT NULL,
+      title TEXT NOT NULL,
+      resource_type TEXT NOT NULL DEFAULT '전자책',
+      request_note TEXT NOT NULL DEFAULT '',
+      delivery_type TEXT NOT NULL,
+      external_url TEXT,
+      object_key TEXT,
+      file_name TEXT,
+      mime_type TEXT,
+      size_bytes INTEGER,
+      created_by TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (target_email) REFERENCES users(email),
+      FOREIGN KEY (created_by) REFERENCES users(email)
+    )`),
     db.prepare("CREATE INDEX IF NOT EXISTS onboarding_tasks_user_idx ON onboarding_tasks (user_email, sort_order)"),
-    db.prepare("CREATE INDEX IF NOT EXISTS student_issues_user_idx ON student_issues (user_email, created_at)")
+    db.prepare("CREATE INDEX IF NOT EXISTS student_issues_user_idx ON student_issues (user_email, created_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS instructor_resources_target_idx ON instructor_resources (target_email, created_at)")
   ]);
   return db;
 }

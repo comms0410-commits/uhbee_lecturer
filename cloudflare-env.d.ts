@@ -20,9 +20,28 @@ interface Fetcher {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
 }
 
+interface R2ObjectBody {
+  body: ReadableStream<Uint8Array>;
+  key: string;
+  size: number;
+  httpMetadata?: { contentType?: string; contentDisposition?: string };
+  writeHttpMetadata(headers: Headers): void;
+}
+
+interface R2Bucket {
+  put(
+    key: string,
+    value: ReadableStream<Uint8Array> | ArrayBuffer | Blob,
+    options?: { httpMetadata?: { contentType?: string; contentDisposition?: string }; customMetadata?: Record<string, string> },
+  ): Promise<unknown>;
+  get(key: string): Promise<R2ObjectBody | null>;
+  delete(key: string): Promise<void>;
+}
+
 declare module "cloudflare:workers" {
   export const env: {
     DB: D1Database;
+    FILES: R2Bucket;
     ASSETS: Fetcher;
     IMAGES: unknown;
   };
