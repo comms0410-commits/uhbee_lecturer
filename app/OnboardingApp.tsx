@@ -112,7 +112,6 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
   const completed = workspace.tasks.filter((task) => task.status === "done").length;
   const progress = Math.round((completed / Math.max(workspace.tasks.length, 1)) * 100);
   const nextTask = workspace.tasks.find((task) => task.status !== "done") ?? workspace.tasks[workspace.tasks.length - 1];
-  const canManage = workspace.user.role === "admin" || workspace.user.role === "superadmin";
 
   const apiPatch = async (payload: Record<string, unknown>) => {
     const response = await fetch("/api/workspace", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
@@ -155,12 +154,8 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
               {item.id === "crisis" && <span className="nav-alert">!</span>}
             </button>
           ))}
-          {canManage && (
-            <>
-              <p className="nav-label nav-label-admin">운영 관리</p>
-              <a className="nav-item" href="/admin"><span className="nav-code">A</span><span>관리자 페이지</span><span className="nav-count">↗</span></a>
-            </>
-          )}
+          <p className="nav-label nav-label-admin">운영 관리</p>
+          <a className="nav-item" href="/admin"><span className="nav-code">A</span><span>관리자 페이지</span><span className="nav-count">↗</span></a>
         </nav>
         <div className="sidebar-foot">
           <span className={`sync-dot ${syncState}`} />
@@ -173,7 +168,8 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
           <button className="mobile-brand" onClick={() => moveTo("home")}>UhB</button>
           <div className="top-context"><span>강사 가이드</span><strong>{navItems.find((item) => item.id === active)?.label}</strong></div>
           <div className="top-actions">
-            {canManage && <div className="view-switch" aria-label="화면 전환"><button className="selected" onClick={() => setActive("home")}>강사 화면</button><a href="/admin">관리자 페이지</a></div>}
+            <div className="view-switch" aria-label="화면 전환"><button className="selected" onClick={() => setActive("home")}>강사 화면</button><a href="/admin">관리자 페이지</a></div>
+            <a className="mobile-admin-link" href="/admin">관리자</a>
             <button className="icon-button" aria-label="알림 3개"><span className="bell-shape" aria-hidden="true" /><b>3</b></button>
             <a className="user-pill" href="/signout-with-chatgpt?return_to=%2F" title="로그아웃"><span>{displayFirstName(workspace.user.displayName).slice(0, 1)}</span><strong>{displayFirstName(workspace.user.displayName)}</strong></a>
           </div>

@@ -74,7 +74,9 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
   const [instructor, setInstructor] = useState(emptyInstructor);
   const [resource, setResource] = useState(emptyResource);
   const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState<"" | "load" | "instructor" | "resource">("load");
+  const [credentials, setCredentials] = useState({ username: "uhbee", password: "" });
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [busy, setBusy] = useState<"" | "load" | "login" | "instructor" | "resource">("load");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -84,8 +86,14 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
     try {
       const response = await fetch("/api/admin", { cache: "no-store" });
       const payload = await response.json() as AdminData & { error?: string };
+      if (response.status === 403) {
+        setData(null);
+        setNeedsLogin(true);
+        return;
+      }
       if (!response.ok) throw new Error(payload.error ?? "관리자 데이터를 불러오지 못했습니다.");
       setData(payload);
+      setNeedsLogin(false);
       setResource((current) => ({ ...current, targetEmail: current.targetEmail || payload.instructors[0]?.email || "" }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "관리자 데이터를 불러오지 못했습니다.");
@@ -106,6 +114,36 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
     const total = data.instructors.reduce((sum, item) => sum + (Number(item.done_count) / Math.max(Number(item.task_count), 1)) * 100, 0);
     return Math.round(total / data.instructors.length);
   }, [data]);
+
+  const login = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy("login");
+    setError("");
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(credentials),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "관리자 로그인에 실패했습니다.");
+      setCredentials((current) => ({ ...current, password: "" }));
+      setNeedsLogin(false);
+      setMessage("관리자 계정으로 로그인했습니다.");
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "관리자 로그인에 실패했습니다.");
+      setBusy("");
+    }
+  };
+
+  const logout = async () => {
+    await fetch("/api/admin/login", { method: "DELETE" });
+    setData(null);
+    setNeedsLogin(true);
+    setError("");
+    setMessage("관리자 로그아웃이 완료되었습니다.");
+  };
 
   const registerInstructor = async (event: FormEvent) => {
     event.preventDefault();
@@ -153,6 +191,26 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
     }
   };
 
+  if (needsLogin && !data) {
+    return (
+      <main className="admin-access-shell">
+        <section className="admin-access-card admin-login-card">
+          <a className="admin-login-brand" href="/">UhB <span>ADMIN CONSOLE</span></a>
+          <span>ADMIN SIGN IN</span>
+          <h1>관리자 계정으로<br />로그인하세요.</h1>
+          <p>강사 등록과 파일·링크 자료 전달은 관리자 로그인 후 이용할 수 있습니다.</p>
+          <form onSubmit={login}>
+            <label><span>관리자 계정</span><input autoComplete="username" required value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} /></label>
+            <label><span>비밀번호</span><input type="password" autoComplete="current-password" required value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="비밀번호를 입력하세요" /></label>
+            {error && <div className="admin-login-error" role="alert">{error}</div>}
+            <button className="primary-button full" disabled={busy === "login"}>{busy === "login" ? "확인하는 중…" : "관리자 로그인"}</button>
+          </form>
+          <a className="admin-login-back" href="/">← 강사 센터로 돌아가기</a>
+        </section>
+      </main>
+    );
+  }
+
   if (error && !data) {
     return (
       <main className="admin-access-shell">
@@ -175,7 +233,7 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
           <button className={tab === "instructors" ? "active" : ""} onClick={() => setTab("instructors")}><span>01</span>강사 관리</button>
           <button className={tab === "resources" ? "active" : ""} onClick={() => setTab("resources")}><span>02</span>요청 자료 전달</button>
         </nav>
-        <a className="admin-back-link" href="/"><span>←</span> 강사 센터로 돌아가기</a>
+        <div className="admin-sidebar-actions"><button onClick={() => void logout()}>관리자 로그아웃</button><a className="admin-back-link" href="/"><span>←</span> 강사 센터로 돌아가기</a></div>
       </aside>
 
       <section className="admin-portal-content">

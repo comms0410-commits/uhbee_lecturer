@@ -44,5 +44,8 @@ declare module "cloudflare:workers" {
     FILES: R2Bucket;
     ASSETS: Fetcher;
     IMAGES: unknown;
+    ADMIN_USERNAME?: string;
+    ADMIN_PASSWORD_HASH?: string;
+    ADMIN_SESSION_SECRET?: string;
   };
 }

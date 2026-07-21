@@ -19,9 +19,11 @@ test("defines the complete UhB instructor center", async () => {
   assert.match(app, /관리자 페이지/);
   assert.match(admin, /신규 강사 등록/);
   assert.match(admin, /파일·링크 전달/);
+  assert.match(admin, /ADMIN SIGN IN/);
+  assert.match(admin, /관리자 로그인/);
   assert.match(displayName, /홍길동/);
   assert.match(page, /siteDisplayName/);
-  assert.doesNotMatch(`${app}${page}${layout}${admin}`, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
+  assert.doesNotMatch(`${app}${page}${layout}${admin}`, /codex-preview|Your site is taking shape|react-loading-skeleton|uhbee1004/i);
 });
 
 test("ships persistence, migrations, and a branded social card", async () => {
@@ -40,6 +42,7 @@ test("ships persistence, migrations, and a branded social card", async () => {
   await access(new URL("../drizzle/0001_wise_havok.sql", import.meta.url));
   await access(new URL("../drizzle/0002_outstanding_doorman.sql", import.meta.url));
   await access(new URL("../app/api/admin/route.ts", import.meta.url));
+  await access(new URL("../app/api/admin/login/route.ts", import.meta.url));
   await access(new URL("../app/api/resources/[id]/route.ts", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
 });

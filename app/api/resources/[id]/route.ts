@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { hasAdminSession } from "../../admin-auth";
 import { ensureUser } from "../../session";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       FROM instructor_resources WHERE id = ?`).bind(id).first<ResourceRow>();
     if (!resource) return Response.json({ error: "자료를 찾을 수 없습니다." }, { status: 404 });
 
-    const canManage = session.user.role === "admin" || session.user.role === "superadmin";
+    const canManage = session.user.role === "admin" || session.user.role === "superadmin" || await hasAdminSession(request);
     if (!canManage && resource.target_email !== session.user.email) {
       return Response.json({ error: "이 자료에 접근할 권한이 없습니다." }, { status: 403 });
     }

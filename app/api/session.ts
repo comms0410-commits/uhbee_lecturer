@@ -1,5 +1,6 @@
 import { ensureCoreSchema } from "@/db/runtime";
 import { siteDisplayName } from "@/app/display-name";
+import { hasAdminSession } from "./admin-auth";
 
 export type Role = "instructor" | "admin" | "superadmin";
 
@@ -82,10 +83,13 @@ export async function ensureUser(request: Request) {
 }
 
 export async function requireAdmin(request: Request) {
-  const session = await ensureUser(request);
-  if (!session) return { error: Response.json({ error: "로그인이 필요합니다." }, { status: 401 }) } as const;
-  if (session.user.role !== "admin" && session.user.role !== "superadmin") {
-    return { error: Response.json({ error: "관리자 권한이 필요합니다." }, { status: 403 }) } as const;
+  if (await hasAdminSession(request)) {
+    const db = await ensureCoreSchema();
+    const adminUser = { email: "admin@uhb.local", display_name: "UhB 관리자", role: "admin" as const };
+    await db.prepare(`INSERT INTO users (email, display_name, role) VALUES (?, ?, ?)
+      ON CONFLICT(email) DO UPDATE SET display_name = excluded.display_name, role = excluded.role`)
+      .bind(adminUser.email, adminUser.display_name, adminUser.role).run();
+    return { session: { db, user: adminUser } } as const;
   }
-  return { session } as const;
+  return { error: Response.json({ error: "관리자 로그인이 필요합니다." }, { status: 403 }) } as const;
 }
