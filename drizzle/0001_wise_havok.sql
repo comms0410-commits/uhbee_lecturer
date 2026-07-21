@@ -1,0 +1,2 @@
+CREATE INDEX `onboarding_tasks_user_idx` ON `onboarding_tasks` (`user_email`,`sort_order`);--> statement-breakpoint
+CREATE INDEX `student_issues_user_idx` ON `student_issues` (`user_email`,`created_at`);
