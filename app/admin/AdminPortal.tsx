@@ -33,8 +33,7 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [issueDrafts, setIssueDrafts] = useState<Record<string, { action: string; reply: string }>>({});
   const [planComment, setPlanComment] = useState(""); const [planStatus, setPlanStatus] = useState("revision"); const [planChecklist, setPlanChecklist] = useState<Record<string, boolean>>({});
-  const [instructorHref, setInstructorHref] = useState("/");
-  useEffect(() => { if (window.location.hostname === "lectureadmin.uhbspro.com") setInstructorHref("https://lecture.uhbspro.com"); }, []);
+  const instructorHref = "/";
 
   const load = async () => { setBusy("load"); setError(""); try { const response = await fetch("/api/admin", { cache: "no-store" }); const payload = await response.json() as AdminData & { error?: string }; if (response.status === 403) { setData(null); setNeedsLogin(true); return; } if (!response.ok) throw new Error(payload.error ?? "관리자 데이터를 불러오지 못했습니다."); setData(payload); setNeedsLogin(false); setSelectedEmail((current) => current && payload.instructors.some((i) => i.email === current) ? current : payload.instructors.at(0)?.email ?? ""); } catch (e) { setError(e instanceof Error ? e.message : "관리자 데이터를 불러오지 못했습니다."); } finally { setBusy(""); } };
   useEffect(() => { void load(); }, []);

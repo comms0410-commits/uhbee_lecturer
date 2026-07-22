@@ -59,8 +59,7 @@ export function OnboardingApp({ initialUser }: { initialUser: { displayName: str
   const [active, setActive] = useState<Section>("home");
   const [syncState, setSyncState] = useState<"loading" | "ready" | "offline">("loading");
   const [toast, setToast] = useState("");
-  const [adminHref, setAdminHref] = useState("/admin");
-  useEffect(() => { if (window.location.hostname === "lecture.uhbspro.com") setAdminHref("https://lectureadmin.uhbspro.com/admin"); }, []);
+  const adminHref = "/admin";
   useEffect(() => { fetch("/api/workspace", { cache: "no-store" }).then(async (r) => { if (!r.ok) throw new Error(); return r.json(); }).then((data) => { setWorkspace(data); setSyncState("ready"); }).catch(() => setSyncState("offline")); }, []);
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(""), 3000); return () => window.clearTimeout(timer); }, [toast]);
   const apiPatch = async (payload: Record<string, unknown>) => { const response = await fetch("/api/workspace", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }); const result = await response.json().catch(() => ({})) as { error?: string; [key: string]: unknown }; if (!response.ok) throw new Error(result.error ?? "저장하지 못했습니다."); return result; };
