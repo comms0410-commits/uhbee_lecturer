@@ -81,6 +81,14 @@ export const adminLoginAttempts = sqliteTable("admin_login_attempts", {
   windowStartedAt: integer("window_started_at").notNull(),
 });
 
+export const instructorCredentials = sqliteTable("instructor_credentials", {
+  userEmail: text("user_email").primaryKey().references(() => users.email),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  passwordSalt: text("password_salt").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const taskProgressUpdates = sqliteTable("task_progress_updates", {
   id: text("id").primaryKey(),
   userEmail: text("user_email").notNull().references(() => users.email),

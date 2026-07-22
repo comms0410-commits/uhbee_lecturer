@@ -87,6 +87,14 @@ export async function ensureCoreSchema() {
       attempts INTEGER NOT NULL DEFAULT 0,
       window_started_at INTEGER NOT NULL
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS instructor_credentials (
+      user_email TEXT PRIMARY KEY NOT NULL,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_email) REFERENCES users(email)
+    )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS task_progress_updates (
       id TEXT PRIMARY KEY NOT NULL,
       user_email TEXT NOT NULL,

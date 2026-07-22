@@ -1,6 +1,7 @@
 import { ensureCoreSchema } from "@/db/runtime";
 import { siteDisplayName } from "@/app/display-name";
 import { hasAdminSession } from "./admin-auth";
+import { getInstructorSession } from "./instructor-auth";
 
 export type Role = "instructor" | "admin" | "superadmin";
 
@@ -63,24 +64,14 @@ export async function seedInstructor(
 }
 
 export async function ensureUser(request: Request) {
-  const identity = requestIdentity(request);
-  if (!identity) return null;
+  const instructorSession = await getInstructorSession(request);
+  if (!instructorSession) return null;
   const db = await ensureCoreSchema();
   const existing = await db.prepare("SELECT email, display_name, role FROM users WHERE email = ?")
-    .bind(identity.email)
+    .bind(instructorSession.email)
     .first<{ email: string; display_name: string; role: Role }>();
-
-  if (!existing) {
-    const count = await db.prepare("SELECT COUNT(*) AS count FROM users").first<{ count: number }>();
-    const role: Role = Number(count?.count ?? 0) === 0 ? "superadmin" : "instructor";
-    await seedInstructor(db, { email: identity.email, displayName: identity.displayName, role });
-    return { db, user: { email: identity.email, display_name: identity.displayName, role } };
-  }
-
-  if (existing.display_name !== identity.displayName) {
-    await db.prepare("UPDATE users SET display_name = ? WHERE email = ?").bind(identity.displayName, identity.email).run();
-  }
-  return { db, user: { ...existing, display_name: identity.displayName } };
+  if (!existing || existing.role !== "instructor") return null;
+  return { db, user: existing };
 }
 
 export async function requireAdmin(request: Request) {

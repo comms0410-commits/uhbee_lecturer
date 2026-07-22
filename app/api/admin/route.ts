@@ -1,10 +1,12 @@
 import { env } from "cloudflare:workers";
 import { siteDisplayName } from "@/app/display-name";
 import { requireAdmin, seedInstructor } from "../session";
+import { hashInstructorPassword } from "../instructor-auth";
 
 export const dynamic = "force-dynamic";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_PATTERN = /^[a-z0-9._-]{4,30}$/;
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 function textValue(form: FormData, key: string) {
@@ -34,14 +36,15 @@ export async function GET(request: Request) {
     const [instructors, resources, tasks, progressUpdates, plans, issues, courseRuns, supportRequests] = await Promise.all([
       db.prepare(`SELECT
         u.email, u.display_name, u.role, u.created_at,
-        p.grade, p.contract_status, p.settlement_rate, p.specialty, p.manager_name,
+        p.grade, p.contract_status, p.settlement_rate, p.specialty, p.manager_name, c.username,
         COUNT(t.id) AS task_count,
         SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END) AS done_count
       FROM users u
       JOIN instructor_profiles p ON p.user_email = u.email
+      LEFT JOIN instructor_credentials c ON c.user_email = u.email
       LEFT JOIN onboarding_tasks t ON t.user_email = u.email
       WHERE u.role = 'instructor' AND p.registered_by_admin = 1
-      GROUP BY u.email, u.display_name, u.role, u.created_at, p.grade, p.contract_status, p.settlement_rate, p.specialty, p.manager_name
+      GROUP BY u.email, u.display_name, u.role, u.created_at, p.grade, p.contract_status, p.settlement_rate, p.specialty, p.manager_name, c.username
       ORDER BY u.created_at DESC`).all(),
       db.prepare(`SELECT r.*, u.display_name AS target_name
         FROM instructor_resources r
@@ -106,13 +109,21 @@ export async function POST(request: Request) {
       if (action === "registerInstructor") {
         const displayName = siteDisplayName(String(body.displayName ?? "").trim());
         const email = String(body.email ?? "").trim().toLowerCase();
+        const username = String(body.username ?? "").trim().toLowerCase();
+        const password = String(body.password ?? "");
         const specialty = String(body.specialty ?? "").trim() || "전문 분야 등록 전";
         const grade = String(body.grade ?? "").trim() || "연습강사";
         const managerName = "매니저";
         const managerEmail = "";
         const settlementRate = Number(body.settlementRate ?? 50);
         if (!displayName || !EMAIL_PATTERN.test(email)) return Response.json({ error: "강사 이름과 올바른 이메일을 입력해 주세요." }, { status: 400 });
+        if (!USERNAME_PATTERN.test(username)) return Response.json({ error: "아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 4~30자 입력해 주세요." }, { status: 400 });
+        if (password.length < 8 || password.length > 64) return Response.json({ error: "비밀번호는 8~64자로 입력해 주세요." }, { status: 400 });
         if (!Number.isInteger(settlementRate) || settlementRate < 0 || settlementRate > 100) return Response.json({ error: "정산율은 0~100 사이의 정수로 입력해 주세요." }, { status: 400 });
+
+        const usernameOwner = await db.prepare("SELECT user_email FROM instructor_credentials WHERE username = ?").bind(username).first<{ user_email: string }>();
+        if (usernameOwner && usernameOwner.user_email !== email) return Response.json({ error: "이미 사용 중인 강사 아이디입니다." }, { status: 409 });
+        const passwordCredential = await hashInstructorPassword(password);
 
         const existing = await db.prepare(`SELECT u.email, u.role, p.registered_by_admin FROM users u
           LEFT JOIN instructor_profiles p ON p.user_email = u.email WHERE u.email = ?`).bind(email).first<{ email: string; role: string; registered_by_admin: number | null }>();
@@ -122,11 +133,16 @@ export async function POST(request: Request) {
             db.prepare("UPDATE users SET display_name = ? WHERE email = ?").bind(displayName, email),
             db.prepare(`UPDATE instructor_profiles SET grade = ?, settlement_rate = ?, specialty = ?, manager_name = ?, manager_email = ?, registered_by_admin = 1 WHERE user_email = ?`)
               .bind(grade, settlementRate, specialty, managerName, managerEmail, email),
+            db.prepare(`INSERT INTO instructor_credentials (user_email, username, password_hash, password_salt, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+              ON CONFLICT(user_email) DO UPDATE SET username = excluded.username, password_hash = excluded.password_hash, password_salt = excluded.password_salt, updated_at = CURRENT_TIMESTAMP`)
+              .bind(email, username, passwordCredential.hash, passwordCredential.salt),
           ]);
         } else {
           await seedInstructor(db, { email, displayName, specialty, grade, settlementRate, managerName, managerEmail, registeredByAdmin: true });
+          await db.prepare("INSERT INTO instructor_credentials (user_email, username, password_hash, password_salt) VALUES (?, ?, ?, ?)")
+            .bind(email, username, passwordCredential.hash, passwordCredential.salt).run();
         }
-        return Response.json({ ok: true, email }, { status: 201 });
+        return Response.json({ ok: true, email, username }, { status: 201 });
       }
 
       if (action === "replyProgress") {

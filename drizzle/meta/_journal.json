@@ -43,6 +43,13 @@
       "when": 1784684869418,
       "tag": "0005_overjoyed_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784688615136,
+      "tag": "0006_brown_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }

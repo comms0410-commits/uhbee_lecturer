@@ -699,6 +699,15 @@ input::placeholder, textarea::placeholder { color: #a1a59f; }
 .brand-mark { margin-bottom: 55px; font-size: 25px; font-weight: 900; letter-spacing: .17em; }
 .signin-card h1 { margin: 8px 0 16px; font-size: clamp(34px, 6vw, 52px); line-height: 1.17; letter-spacing: -.06em; }
 .signin-card p { color: rgba(255,255,255,.66); line-height: 1.7; }
+.instructor-login-card form { display: grid; gap: 14px; margin-top: 26px; }
+.instructor-login-card label { display: grid; gap: 7px; }
+.instructor-login-card label span { color: rgba(255,255,255,.72); font-size: 12px; font-weight: 800; }
+.instructor-login-card input { width: 100%; padding: 14px 15px; color: #fff; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 10px; outline: none; }
+.instructor-login-card input:focus { border-color: #d7e58e; box-shadow: 0 0 0 3px rgba(215,229,142,.12); }
+.instructor-login-card .signin-button { margin-top: 6px; }
+.signin-error { padding: 11px 13px; color: #ffd8ce; font-size: 12px; background: rgba(210,70,45,.18); border: 1px solid rgba(255,140,118,.28); border-radius: 9px; }
+.signin-loading { text-align: center; }
+.signin-loading .brand-mark { margin-bottom: 20px; }
 .signin-button { width: 100%; margin-top: 24px; color: var(--ink); background: #e7edc8; border-color: #e7edc8; }
 .signin-card small { display: block; margin-top: 14px; color: rgba(255,255,255,.42); text-align: center; }
 
