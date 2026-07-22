@@ -37,6 +37,7 @@ test("defines the complete UhB instructor center", async () => {
   assert.match(adminApi, /registeredByAdmin: true/);
   assert.match(adminApi, /hashInstructorPassword/);
   assert.match(instructorAuth, /PBKDF2_ITERATIONS/);
+  assert.match(instructorAuth, /PBKDF2_ITERATIONS = 100_000/);
   assert.match(app, /확인하기/);
   assert.match(app, /진행 공유/);
   assert.match(app, /진행 대기/);

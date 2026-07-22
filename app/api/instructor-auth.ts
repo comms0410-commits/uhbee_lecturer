@@ -3,7 +3,7 @@ import { ensureCoreSchema } from "@/db/runtime";
 
 const COOKIE_NAME = "uhb_instructor_session";
 const SESSION_SECONDS = 60 * 60 * 12;
-const PBKDF2_ITERATIONS = 210_000;
+const PBKDF2_ITERATIONS = 100_000;
 const encoder = new TextEncoder();
 
 function toBase64Url(bytes: Uint8Array) {
