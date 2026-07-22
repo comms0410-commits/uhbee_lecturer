@@ -16,6 +16,7 @@ export const instructorProfiles = sqliteTable("instructor_profiles", {
   specialty: text("specialty").notNull().default("전문 분야 등록 전"),
   managerName: text("manager_name").notNull().default("이수민 매니저"),
   managerEmail: text("manager_email").notNull().default("support@ubii.co.kr"),
+  registeredByAdmin: integer("registered_by_admin", { mode: "boolean" }).notNull().default(false),
 });
 
 export const onboardingTasks = sqliteTable("onboarding_tasks", {

@@ -36,7 +36,7 @@ export async function GET(request: Request) {
       FROM users u
       JOIN instructor_profiles p ON p.user_email = u.email
       LEFT JOIN onboarding_tasks t ON t.user_email = u.email
-      WHERE u.role = 'instructor'
+      WHERE u.role = 'instructor' AND p.registered_by_admin = 1
       GROUP BY u.email, u.display_name, u.role, u.created_at, p.grade, p.contract_status, p.settlement_rate, p.specialty, p.manager_name, p.manager_email
       ORDER BY u.created_at DESC`).all(),
       db.prepare(`SELECT
@@ -85,10 +85,24 @@ export async function POST(request: Request) {
       if (!Number.isInteger(settlementRate) || settlementRate < 0 || settlementRate > 100) {
         return Response.json({ error: "정산율은 0~100 사이의 정수로 입력해 주세요." }, { status: 400 });
       }
-      const existing = await db.prepare("SELECT email FROM users WHERE email = ?").bind(email).first();
-      if (existing) return Response.json({ error: "이미 등록된 이메일입니다." }, { status: 409 });
+      const existing = await db.prepare(`SELECT u.email, u.role, p.registered_by_admin
+        FROM users u
+        LEFT JOIN instructor_profiles p ON p.user_email = u.email
+        WHERE u.email = ?`).bind(email).first<{ email: string; role: string; registered_by_admin: number | null }>();
+      if (existing) {
+        if (existing.role !== "instructor" || Number(existing.registered_by_admin) === 1) {
+          return Response.json({ error: "이미 등록된 이메일입니다." }, { status: 409 });
+        }
+        await db.batch([
+          db.prepare("UPDATE users SET display_name = ? WHERE email = ?").bind(displayName, email),
+          db.prepare(`UPDATE instructor_profiles SET
+            grade = ?, settlement_rate = ?, specialty = ?, manager_name = ?, manager_email = ?, registered_by_admin = 1
+            WHERE user_email = ?`).bind(grade, settlementRate, specialty, managerName, managerEmail, email),
+        ]);
+        return Response.json({ ok: true, email }, { status: 201 });
+      }
 
-      await seedInstructor(db, { email, displayName, specialty, grade, settlementRate, managerName, managerEmail });
+      await seedInstructor(db, { email, displayName, specialty, grade, settlementRate, managerName, managerEmail, registeredByAdmin: true });
       return Response.json({ ok: true, email }, { status: 201 });
     }
 
@@ -108,7 +122,10 @@ export async function POST(request: Request) {
     if (!targetEmail || !title || !["link", "file"].includes(deliveryType)) {
       return Response.json({ error: "대상 강사, 자료명, 전달 방식을 확인해 주세요." }, { status: 400 });
     }
-    const target = await db.prepare("SELECT email FROM users WHERE email = ? AND role = 'instructor'").bind(targetEmail).first();
+    const target = await db.prepare(`SELECT u.email
+      FROM users u
+      JOIN instructor_profiles p ON p.user_email = u.email
+      WHERE u.email = ? AND u.role = 'instructor' AND p.registered_by_admin = 1`).bind(targetEmail).first();
     if (!target) return Response.json({ error: "등록된 강사를 선택해 주세요." }, { status: 400 });
     if (deliveryType === "link" && !validWebUrl(externalUrl)) {
       return Response.json({ error: "http:// 또는 https://로 시작하는 올바른 링크를 입력해 주세요." }, { status: 400 });

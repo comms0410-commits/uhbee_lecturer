@@ -3,11 +3,12 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("defines the complete UhB instructor center", async () => {
-  const [app, page, layout, admin, displayName] = await Promise.all([
+  const [app, page, layout, admin, adminApi, displayName] = await Promise.all([
     readFile(new URL("../app/OnboardingApp.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/admin/AdminPortal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/admin/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/display-name.ts", import.meta.url), "utf8"),
   ]);
 
@@ -21,6 +22,10 @@ test("defines the complete UhB instructor center", async () => {
   assert.match(admin, /파일·링크 전달/);
   assert.match(admin, /ADMIN SIGN IN/);
   assert.match(admin, /관리자 로그인/);
+  assert.match(admin, /등록된 강사가 없습니다/);
+  assert.doesNotMatch(admin, /payload\.instructors\[0\]/);
+  assert.match(adminApi, /p\.registered_by_admin = 1/);
+  assert.match(adminApi, /registeredByAdmin: true/);
   assert.match(displayName, /홍길동/);
   assert.match(page, /siteDisplayName/);
   assert.doesNotMatch(`${app}${page}${layout}${admin}`, /codex-preview|Your site is taking shape|react-loading-skeleton|uhbee1004/i);
@@ -42,6 +47,7 @@ test("ships persistence, migrations, and a branded social card", async () => {
   await access(new URL("../drizzle/0001_wise_havok.sql", import.meta.url));
   await access(new URL("../drizzle/0002_outstanding_doorman.sql", import.meta.url));
   await access(new URL("../drizzle/0003_tiny_korvac.sql", import.meta.url));
+  await access(new URL("../drizzle/0004_graceful_the_executioner.sql", import.meta.url));
   await access(new URL("../app/api/admin/route.ts", import.meta.url));
   await access(new URL("../app/api/admin/login/route.ts", import.meta.url));
   await access(new URL("../app/api/resources/[id]/route.ts", import.meta.url));

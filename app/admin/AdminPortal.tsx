@@ -94,7 +94,6 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
       if (!response.ok) throw new Error(payload.error ?? "관리자 데이터를 불러오지 못했습니다.");
       setData(payload);
       setNeedsLogin(false);
-      setResource((current) => ({ ...current, targetEmail: current.targetEmail || payload.instructors[0]?.email || "" }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "관리자 데이터를 불러오지 못했습니다.");
     } finally {
@@ -178,8 +177,7 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
       const response = await fetch("/api/admin", { method: "POST", body: form });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "자료를 전달하지 못했습니다.");
-      const targetEmail = resource.targetEmail;
-      setResource({ ...emptyResource, targetEmail });
+      setResource(emptyResource);
       setFile(null);
       const fileInput = document.getElementById("resource-file") as HTMLInputElement | null;
       if (fileInput) fileInput.value = "";
@@ -275,7 +273,7 @@ export function AdminPortal({ initialUser }: { initialUser: { displayName: strin
             <div className="admin-work-grid">
               <form className="admin-form-panel" onSubmit={createResource}>
                 <div className="admin-panel-title"><span>RESOURCE DELIVERY</span><h2>요청 자료 전달</h2><p>강사의 요청 내용을 기록하고 파일 또는 링크를 개인 자료실에 보냅니다.</p></div>
-                <div className="admin-form-grid two"><label><span>대상 강사 *</span><select required value={resource.targetEmail} onChange={(event) => setResource({ ...resource, targetEmail: event.target.value })}><option value="">강사를 선택하세요</option>{data?.instructors.map((item) => <option key={item.email} value={item.email}>{item.display_name} · {item.email}</option>)}</select></label><label><span>자료 종류</span><select value={resource.resourceType} onChange={(event) => setResource({ ...resource, resourceType: event.target.value })}><option>전자책</option><option>템플릿</option><option>강의자료</option><option>워크시트</option><option>기타</option></select></label></div>
+                <div className="admin-form-grid two"><label><span>대상 강사 *</span><select required disabled={!data?.instructors.length} value={resource.targetEmail} onChange={(event) => setResource({ ...resource, targetEmail: event.target.value })}><option value="">{data?.instructors.length ? "강사를 선택하세요" : "등록된 강사가 없습니다"}</option>{data?.instructors.map((item) => <option key={item.email} value={item.email}>{item.display_name} · {item.email}</option>)}</select></label><label><span>자료 종류</span><select value={resource.resourceType} onChange={(event) => setResource({ ...resource, resourceType: event.target.value })}><option>전자책</option><option>템플릿</option><option>강의자료</option><option>워크시트</option><option>기타</option></select></label></div>
                 <label><span>자료명 *</span><input required value={resource.title} onChange={(event) => setResource({ ...resource, title: event.target.value })} placeholder="요청한 전자책 또는 자료 이름" /></label>
                 <label><span>강사 요청 내용</span><textarea rows={4} value={resource.requestNote} onChange={(event) => setResource({ ...resource, requestNote: event.target.value })} placeholder="요청 배경, 필요한 범위, 전달 메모를 기록하세요." /></label>
                 <div className="delivery-switch" aria-label="전달 방식"><button type="button" className={resource.deliveryType === "link" ? "active" : ""} onClick={() => setResource({ ...resource, deliveryType: "link" })}>링크로 전달</button><button type="button" className={resource.deliveryType === "file" ? "active" : ""} onClick={() => setResource({ ...resource, deliveryType: "file" })}>파일 업로드</button></div>

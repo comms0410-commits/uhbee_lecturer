@@ -22,6 +22,7 @@ export async function ensureCoreSchema() {
       specialty TEXT NOT NULL DEFAULT '전문 분야 등록 전',
       manager_name TEXT NOT NULL DEFAULT '이수민 매니저',
       manager_email TEXT NOT NULL DEFAULT 'support@ubii.co.kr',
+      registered_by_admin INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (user_email) REFERENCES users(email)
     )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS onboarding_tasks (
@@ -84,5 +85,11 @@ export async function ensureCoreSchema() {
     db.prepare("CREATE INDEX IF NOT EXISTS student_issues_user_idx ON student_issues (user_email, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS instructor_resources_target_idx ON instructor_resources (target_email, created_at)")
   ]);
+  try {
+    await db.prepare("ALTER TABLE instructor_profiles ADD COLUMN registered_by_admin INTEGER NOT NULL DEFAULT 0").run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (!message.includes("duplicate column")) throw error;
+  }
   return db;
 }

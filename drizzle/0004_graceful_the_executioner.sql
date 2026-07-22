@@ -1,0 +1,1 @@
+ALTER TABLE `instructor_profiles` ADD `registered_by_admin` integer DEFAULT false NOT NULL;
