@@ -17,7 +17,9 @@ test("defines the complete UhB instructor center", async () => {
   assert.match(layout, /title: "어비 강사 온보딩 센터"/);
   assert.match(page, /InstructorAccess/);
   assert.match(instructorAccess, /강사 계정으로/);
+  assert.match(instructorAccess, /관리자 로그인/);
   assert.match(instructorAccess, /api\/instructor\/login/);
+  assert.match(instructorAccess, /api\/admin\/login/);
   assert.match(app, /내 진행현황/);
   assert.match(app, /강의 기획안/);
   assert.match(app, /위기대응 센터/);
