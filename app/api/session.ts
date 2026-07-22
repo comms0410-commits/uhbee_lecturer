@@ -28,7 +28,7 @@ export function requestIdentity(request: Request) {
 
   const host = new URL(request.url).hostname;
   if (host === "localhost" || host === "127.0.0.1") {
-    return { email: "demo@localhost", displayName: "김어비" };
+    return { email: "demo@localhost.test", displayName: "홍길동" };
   }
   return null;
 }
@@ -52,7 +52,7 @@ export async function seedInstructor(
     db.prepare("INSERT INTO users (email, display_name, role) VALUES (?, ?, ?)")
       .bind(email, input.displayName.trim(), input.role ?? "instructor"),
     db.prepare("INSERT INTO instructor_profiles (user_email, grade, contract_status, settlement_rate, specialty, manager_name, manager_email, registered_by_admin) VALUES (?, ?, '계약 완료', ?, ?, ?, ?, ?)")
-      .bind(email, input.grade ?? "연습강사", input.settlementRate ?? 50, input.specialty ?? "전문 분야 등록 전", input.managerName ?? "이수민 매니저", input.managerEmail ?? "support@ubii.co.kr", input.registeredByAdmin ? 1 : 0),
+      .bind(email, input.grade ?? "연습강사", input.settlementRate ?? 50, input.specialty ?? "전문 분야 등록 전", input.managerName ?? "매니저", input.managerEmail ?? "", input.registeredByAdmin ? 1 : 0),
     db.prepare("INSERT INTO lesson_plans (user_email, content, status, version) VALUES (?, '{}', 'draft', 1)").bind(email),
     ...DEFAULT_TASKS.map(([id, stage, title, category, status, dueDate], index) =>
       db.prepare("INSERT INTO onboarding_tasks (id, user_email, stage, title, category, status, due_date, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")

@@ -37,6 +37,7 @@ export const lessonPlans = sqliteTable("lesson_plans", {
   status: text("status", { enum: ["draft", "review", "revision", "approved"] }).notNull().default("draft"),
   version: integer("version").notNull().default(1),
   reviewerComment: text("reviewer_comment"),
+  reviewChecklist: text("review_checklist").notNull().default("{}"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -50,6 +51,9 @@ export const studentIssues = sqliteTable("student_issues", {
   immediateAction: text("immediate_action").notNull().default(""),
   evidenceUrl: text("evidence_url"),
   status: text("status", { enum: ["reported", "reviewing", "resolved"] }).notNull().default("reported"),
+  adminAction: text("admin_action"),
+  adminReply: text("admin_reply"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("student_issues_user_idx").on(table.userEmail, table.createdAt)]);
 
@@ -59,7 +63,9 @@ export const instructorResources = sqliteTable("instructor_resources", {
   title: text("title").notNull(),
   resourceType: text("resource_type").notNull().default("전자책"),
   requestNote: text("request_note").notNull().default(""),
-  deliveryType: text("delivery_type", { enum: ["link", "file"] }).notNull(),
+  deliveryType: text("delivery_type", { enum: ["text", "link", "file"] }).notNull(),
+  placement: text("placement", { enum: ["roadmap", "library"] }).notNull().default("library"),
+  stage: integer("stage"),
   externalUrl: text("external_url"),
   objectKey: text("object_key"),
   fileName: text("file_name"),
@@ -74,3 +80,34 @@ export const adminLoginAttempts = sqliteTable("admin_login_attempts", {
   attempts: integer("attempts").notNull().default(0),
   windowStartedAt: integer("window_started_at").notNull(),
 });
+
+export const taskProgressUpdates = sqliteTable("task_progress_updates", {
+  id: text("id").primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email),
+  taskId: text("task_id").notNull().references(() => onboardingTasks.id),
+  progressNote: text("progress_note").notNull(),
+  question: text("question").notNull().default(""),
+  adminReply: text("admin_reply"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  repliedAt: text("replied_at"),
+}, (table) => [index("task_progress_user_idx").on(table.userEmail, table.createdAt)]);
+
+export const courseRuns = sqliteTable("course_runs", {
+  id: text("id").primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email),
+  courseTitle: text("course_title").notNull(),
+  freeLectureDate: text("free_lecture_date").notNull(),
+  curriculumDate: text("curriculum_date").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("course_runs_user_idx").on(table.userEmail, table.createdAt)]);
+
+export const supportRequests = sqliteTable("support_requests", {
+  id: text("id").primaryKey(),
+  userEmail: text("user_email").notNull().references(() => users.email),
+  requestType: text("request_type").notNull(),
+  message: text("message").notNull(),
+  adminReply: text("admin_reply"),
+  status: text("status", { enum: ["open", "answered"] }).notNull().default("open"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  repliedAt: text("replied_at"),
+}, (table) => [index("support_requests_user_idx").on(table.userEmail, table.createdAt)]);

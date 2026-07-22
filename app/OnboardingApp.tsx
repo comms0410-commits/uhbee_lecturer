@@ -5,357 +5,153 @@ import { siteDisplayName } from "./display-name";
 
 type TaskStatus = "not_started" | "in_progress" | "review" | "revision" | "done";
 type Section = "home" | "roadmap" | "planner" | "operations" | "zoom" | "coach" | "crisis" | "library" | "support";
-
-type Task = {
-  id: string;
-  stage: number;
-  title: string;
-  category: string;
-  status: TaskStatus;
-  due_date: string | null;
-  sort_order: number;
-};
-
-type DeliveredResource = {
-  id: string;
-  title: string;
-  resource_type: string;
-  request_note: string;
-  delivery_type: "link" | "file";
-  external_url: string | null;
-  file_name: string | null;
-  mime_type: string | null;
-  size_bytes: number | null;
-  created_at: string;
-};
-
+type Task = { id: string; stage: number; title: string; category: string; status: TaskStatus; due_date: string | null; sort_order: number };
+type DeliveredResource = { id: string; title: string; resource_type: string; request_note: string; delivery_type: "text" | "link" | "file"; placement: "roadmap" | "library"; stage: number | null; external_url: string | null; file_name: string | null; mime_type: string | null; size_bytes: number | null; created_at: string };
+type ProgressUpdate = { id: string; task_id: string; progress_note: string; question: string; admin_reply: string | null; created_at: string; replied_at: string | null };
+type CourseRun = { id: string; course_title: string; free_lecture_date: string; curriculum_date: string; created_at: string };
+type Issue = { id: string; severity: number; category: string; course_name: string; detail: string; immediate_action: string; evidence_url: string | null; status: string; admin_action: string | null; admin_reply: string | null; created_at: string; updated_at: string | null };
+type SupportRequest = { id: string; request_type: string; message: string; admin_reply: string | null; status: string; created_at: string; replied_at: string | null };
 type Workspace = {
   user: { email: string; displayName: string; role: "instructor" | "admin" | "superadmin" };
-  profile: { grade: string; contract_status: string; settlement_rate: number; specialty: string; manager_name: string; manager_email: string };
+  profile: { grade: string; contract_status: string; settlement_rate: number; specialty: string; manager_name: string };
   tasks: Task[];
-  plan: { content: Record<string, string>; status: string; version: number; reviewerComment: string | null; updatedAt: string | null };
-  issues: Array<{ id: string; severity: number; category: string; course_name: string; status: string; created_at: string }>;
+  plan: { content: Record<string, string>; status: string; version: number; reviewerComment: string | null; reviewChecklist: Record<string, boolean>; updatedAt: string | null };
+  issues: Issue[];
   resources: DeliveredResource[];
+  progressUpdates: ProgressUpdate[];
+  courseRuns: CourseRun[];
+  supportRequests: SupportRequest[];
 };
 
 const navItems: Array<{ id: Section; label: string; code: string }> = [
-  { id: "home", label: "내 진행현황", code: "01" },
-  { id: "roadmap", label: "강사 육성 로드맵", code: "02" },
-  { id: "planner", label: "강의 기획안", code: "03" },
-  { id: "operations", label: "강의 운영 매뉴얼", code: "04" },
-  { id: "zoom", label: "Zoom 사용법", code: "05" },
-  { id: "coach", label: "코치방·수강생", code: "06" },
-  { id: "crisis", label: "위기대응 센터", code: "07" },
-  { id: "library", label: "자료실", code: "08" },
+  { id: "home", label: "내 진행현황", code: "01" }, { id: "roadmap", label: "강사 육성 로드맵", code: "02" },
+  { id: "planner", label: "강의 기획안", code: "03" }, { id: "operations", label: "강의 운영 매뉴얼", code: "04" },
+  { id: "zoom", label: "Zoom 사용법", code: "05" }, { id: "coach", label: "코치방·수강생", code: "06" },
+  { id: "crisis", label: "위기대응 센터", code: "07" }, { id: "library", label: "자료실", code: "08" },
   { id: "support", label: "문의·지원", code: "09" },
 ];
 
 const defaultTasks: Task[] = [
-  { id: "profile", stage: 1, title: "강사 프로필과 전문 분야 등록", category: "기본 정보", status: "done", due_date: "7월 18일", sort_order: 0 },
-  { id: "channel", stage: 2, title: "채널 진단 결과 제출", category: "채널·콘텐츠", status: "done", due_date: "7월 19일", sort_order: 1 },
-  { id: "skills", stage: 3, title: "강의 스킬 기본교육 이수", category: "강사 역량", status: "done", due_date: "7월 20일", sort_order: 2 },
-  { id: "plan", stage: 4, title: "무료강의 기획안 보완", category: "강의 설계", status: "revision", due_date: "오늘", sort_order: 3 },
-  { id: "rehearsal", stage: 5, title: "Zoom 리허설 참여", category: "운영 검증", status: "in_progress", due_date: "7월 23일", sort_order: 4 },
-  { id: "coach", stage: 6, title: "코치방 개설 및 링크 제출", category: "수강생 성공", status: "not_started", due_date: "7월 25일", sort_order: 5 },
-  { id: "safety", stage: 7, title: "위기대응 교육 확인", category: "위험 관리", status: "not_started", due_date: "7월 26일", sort_order: 6 },
-];
+  ["profile", 1, "강사 프로필과 전문 분야 등록", "기본 정보"], ["channel", 2, "채널 진단 결과 제출", "채널·콘텐츠"],
+  ["skills", 3, "강의 스킬 기본교육 이수", "강사 역량"], ["plan", 4, "무료강의 기획안 보완", "강의 설계"],
+  ["rehearsal", 5, "Zoom 리허설 참여", "운영 검증"], ["coach", 6, "코치방 개설 및 링크 제출", "수강생 성공"],
+  ["safety", 7, "위기대응 교육 확인", "위험 관리"],
+].map(([id, stage, title, category], index) => ({ id: String(id), stage: Number(stage), title: String(title), category: String(category), status: "not_started" as TaskStatus, due_date: null, sort_order: index }));
 
 const emptyWorkspace = (name: string, email: string): Workspace => ({
-  user: { email, displayName: name, role: "superadmin" },
-  profile: { grade: "연습강사", contract_status: "계약 완료", settlement_rate: 50, specialty: "AI 업무자동화", manager_name: "이수민 매니저", manager_email: "support@ubii.co.kr" },
-  tasks: defaultTasks,
-  plan: { content: {}, status: "draft", version: 1, reviewerComment: "성과 표현의 근거와 실습 완료 기준을 조금 더 구체적으로 적어 주세요.", updatedAt: null },
-  issues: [],
-  resources: [],
+  user: { email, displayName: name, role: "instructor" },
+  profile: { grade: "연습강사", contract_status: "계약 완료", settlement_rate: 50, specialty: "전문 분야 등록 전", manager_name: "매니저" },
+  tasks: defaultTasks, plan: { content: {}, status: "draft", version: 1, reviewerComment: null, reviewChecklist: {}, updatedAt: null },
+  issues: [], resources: [], progressUpdates: [], courseRuns: [], supportRequests: [],
 });
 
 const statusMeta: Record<TaskStatus, { label: string; tone: string }> = {
-  not_started: { label: "미시작", tone: "neutral" },
-  in_progress: { label: "진행 중", tone: "blue" },
-  review: { label: "검토 대기", tone: "orange" },
-  revision: { label: "보완 필요", tone: "red" },
-  done: { label: "완료", tone: "green" },
+  not_started: { label: "진행 대기", tone: "neutral" }, in_progress: { label: "진행 중", tone: "blue" }, review: { label: "관리자 확인 중", tone: "orange" }, revision: { label: "보완 필요", tone: "red" }, done: { label: "완료", tone: "green" },
 };
-
 const planSteps = ["강의 기본 정보", "수강생 이해", "강의 목표", "회차별 커리큘럼", "무료강의 설계", "운영 설계", "수강생 지원", "표현·운영 점검"];
+const reviewChecks = [{ key: "goal", label: "행동 중심 목표" }, { key: "practice", label: "실습 산출물" }, { key: "disclaimer", label: "개인차 명시" }, { key: "copyright", label: "저작권 확인" }];
 
-function displayFirstName(name: string) {
-  const trimmed = siteDisplayName(name).trim();
-  if (!trimmed) return "강사";
-  return trimmed.includes("@") ? "강사" : trimmed.split(" ")[0];
-}
+function displayFirstName(name: string) { const value = siteDisplayName(name).trim(); return !value || value.includes("@") ? "강사" : value.split(" ")[0]; }
+function formatDate(value: string) { return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value)); }
 
 export function OnboardingApp({ initialUser }: { initialUser: { displayName: string; email: string } }) {
   const [workspace, setWorkspace] = useState<Workspace>(() => emptyWorkspace(initialUser.displayName, initialUser.email));
   const [active, setActive] = useState<Section>("home");
   const [syncState, setSyncState] = useState<"loading" | "ready" | "offline">("loading");
   const [toast, setToast] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/workspace", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("workspace unavailable");
-        return response.json() as Promise<Workspace>;
-      })
-      .then((data) => { if (!cancelled) { setWorkspace(data); setSyncState("ready"); } })
-      .catch(() => { if (!cancelled) setSyncState("offline"); });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 2600);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  const completed = workspace.tasks.filter((task) => task.status === "done").length;
-  const progress = Math.round((completed / Math.max(workspace.tasks.length, 1)) * 100);
-  const nextTask = workspace.tasks.find((task) => task.status !== "done") ?? workspace.tasks[workspace.tasks.length - 1];
-
-  const apiPatch = async (payload: Record<string, unknown>) => {
-    const response = await fetch("/api/workspace", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({})) as { error?: string };
-      throw new Error(result.error ?? "저장하지 못했습니다.");
-    }
-    return response.json();
-  };
-
-  const toggleTask = async (task: Task) => {
-    const nextStatus: TaskStatus = task.status === "done" ? "in_progress" : "done";
-    setWorkspace((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === task.id ? { ...item, status: nextStatus } : item) }));
-    try {
-      await apiPatch({ action: "toggleTask", id: task.id, status: nextStatus });
-      setToast(nextStatus === "done" ? "완료로 기록했어요." : "진행 중으로 되돌렸어요.");
-    } catch (error) {
-      setWorkspace((current) => ({ ...current, tasks: current.tasks.map((item) => item.id === task.id ? task : item) }));
-      setToast(error instanceof Error ? error.message : "저장하지 못했습니다.");
-    }
-  };
-
+  useEffect(() => { fetch("/api/workspace", { cache: "no-store" }).then(async (r) => { if (!r.ok) throw new Error(); return r.json(); }).then((data) => { setWorkspace(data); setSyncState("ready"); }).catch(() => setSyncState("offline")); }, []);
+  useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(""), 3000); return () => window.clearTimeout(timer); }, [toast]);
+  const apiPatch = async (payload: Record<string, unknown>) => { const response = await fetch("/api/workspace", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }); const result = await response.json().catch(() => ({})) as { error?: string; [key: string]: unknown }; if (!response.ok) throw new Error(result.error ?? "저장하지 못했습니다."); return result; };
+  const setTaskStatus = async (task: Task, status: TaskStatus) => { const before = task.status; setWorkspace((w) => ({ ...w, tasks: w.tasks.map((t) => t.id === task.id ? { ...t, status } : t) })); try { await apiPatch({ action: "toggleTask", id: task.id, status }); setToast(status === "done" ? "완료로 기록했습니다." : "진행 대기로 변경했습니다."); } catch (e) { setWorkspace((w) => ({ ...w, tasks: w.tasks.map((t) => t.id === task.id ? { ...t, status: before } : t) })); setToast(e instanceof Error ? e.message : "저장하지 못했습니다."); } };
   const moveTo = (section: Section) => { setActive(section); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const completed = workspace.tasks.filter((t) => t.status === "done").length;
+  const progress = Math.round(completed / Math.max(workspace.tasks.length, 1) * 100);
+  const nextTask = workspace.tasks.find((t) => t.status !== "done") ?? workspace.tasks.at(-1)!;
 
-  return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <button className="wordmark" onClick={() => moveTo("home")} aria-label="어비 강사 센터 홈">
-          <span className="wordmark-main">UhB</span><span className="wordmark-sub">INSTRUCTOR CENTER</span>
-        </button>
-        <div className="profile-mini">
-          <div className="avatar">{displayFirstName(workspace.user.displayName).slice(0, 1)}</div>
-          <div><strong>{displayFirstName(workspace.user.displayName)} 강사</strong><span>{workspace.profile.grade} · {workspace.profile.specialty}</span></div>
-        </div>
-        <nav aria-label="주요 메뉴">
-          <p className="nav-label">강사 가이드</p>
-          {navItems.map((item) => (
-            <button key={item.id} className={`nav-item ${active === item.id ? "active" : ""}`} onClick={() => moveTo(item.id)}>
-              <span className="nav-code">{item.code}</span><span>{item.label}</span>
-              {item.id === "crisis" && <span className="nav-alert">!</span>}
-            </button>
-          ))}
-          <p className="nav-label nav-label-admin">운영 관리</p>
-          <a className="nav-item" href="/admin"><span className="nav-code">A</span><span>관리자 페이지</span><span className="nav-count">↗</span></a>
-        </nav>
-        <div className="sidebar-foot">
-          <span className={`sync-dot ${syncState}`} />
-          <div><strong>{syncState === "ready" ? "안전하게 저장 중" : syncState === "offline" ? "미리보기 모드" : "데이터 연결 중"}</strong><span>마지막 확인 · 방금 전</span></div>
-        </div>
-      </aside>
-
-      <section className="app-content">
-        <header className="topbar">
-          <button className="mobile-brand" onClick={() => moveTo("home")}>UhB</button>
-          <div className="top-context"><span>강사 가이드</span><strong>{navItems.find((item) => item.id === active)?.label}</strong></div>
-          <div className="top-actions">
-            <div className="view-switch" aria-label="화면 전환"><button className="selected" onClick={() => setActive("home")}>강사 화면</button><a href="/admin">관리자 페이지</a></div>
-            <a className="mobile-admin-link" href="/admin">관리자</a>
-            <button className="icon-button" aria-label="알림 3개"><span className="bell-shape" aria-hidden="true" /><b>3</b></button>
-            <a className="user-pill" href="/signout-with-chatgpt?return_to=%2F" title="로그아웃"><span>{displayFirstName(workspace.user.displayName).slice(0, 1)}</span><strong>{displayFirstName(workspace.user.displayName)}</strong></a>
-          </div>
-        </header>
-
-        <main className="main-stage">
-          <>
-              {active === "home" && <HomeDashboard workspace={workspace} progress={progress} nextTask={nextTask} onToggle={toggleTask} onMove={moveTo} />}
-              {active === "roadmap" && <Roadmap tasks={workspace.tasks} onToggle={toggleTask} />}
-              {active === "planner" && <Planner workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}
-              {active === "operations" && <Operations notify={setToast} />}
-              {active === "zoom" && <ZoomGuide notify={setToast} />}
-              {active === "coach" && <CoachGuide notify={setToast} />}
-              {active === "crisis" && <CrisisCenter workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}
-              {active === "library" && <Library resources={workspace.resources} notify={setToast} />}
-              {active === "support" && <Support notify={setToast} />}
-          </>
-        </main>
-
-        <nav className="mobile-nav" aria-label="모바일 빠른 메뉴">
-          {[navItems[0], navItems[1], navItems[2], navItems[6], navItems[7]].map((item) => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => moveTo(item.id)}><span>{item.code}</span>{item.label.replace("강사 ", "").replace("·수강생", "")}</button>)}
-        </nav>
-      </section>
-      {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
-    </div>
-  );
+  return <div className="app-shell"><aside className="sidebar"><button className="wordmark" onClick={() => moveTo("home")}><span className="wordmark-main">UhB</span><span className="wordmark-sub">INSTRUCTOR CENTER</span></button><div className="profile-mini"><div className="avatar">{displayFirstName(workspace.user.displayName).slice(0, 1)}</div><div><strong>{displayFirstName(workspace.user.displayName)} 강사</strong><span>{workspace.profile.grade} · {workspace.profile.specialty}</span></div></div><nav aria-label="주요 메뉴"><p className="nav-label">강사 가이드</p>{navItems.map((item) => <button key={item.id} className={`nav-item ${active === item.id ? "active" : ""}`} onClick={() => moveTo(item.id)}><span className="nav-code">{item.code}</span><span>{item.label}</span>{item.id === "crisis" && <span className="nav-alert">!</span>}</button>)}<p className="nav-label nav-label-admin">운영 관리</p><a className="nav-item" href="/admin"><span className="nav-code">A</span><span>관리자 페이지</span><span className="nav-count">↗</span></a></nav><div className="sidebar-foot"><span className={`sync-dot ${syncState}`} /><div><strong>{syncState === "ready" ? "안전하게 저장 중" : syncState === "offline" ? "미리보기 모드" : "데이터 연결 중"}</strong><span>마지막 확인 · 방금 전</span></div></div></aside>
+    <section className="app-content"><header className="topbar"><button className="mobile-brand" onClick={() => moveTo("home")}>UhB</button><div className="top-context"><span>강사 가이드</span><strong>{navItems.find((item) => item.id === active)?.label}</strong></div><div className="top-actions"><div className="view-switch"><button className="selected" onClick={() => setActive("home")}>강사 화면</button><a href="/admin">관리자 페이지</a></div><a className="mobile-admin-link" href="/admin">관리자</a><a className="user-pill" href="/signout-with-chatgpt?return_to=%2F"><span>{displayFirstName(workspace.user.displayName).slice(0, 1)}</span><strong>{displayFirstName(workspace.user.displayName)}</strong></a></div></header>
+      <main className="main-stage">{active === "home" && <HomeDashboard workspace={workspace} progress={progress} nextTask={nextTask} onMove={moveTo} />}{active === "roadmap" && <Roadmap workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} onSetStatus={setTaskStatus} notify={setToast} />}{active === "planner" && <Planner workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}{active === "operations" && <Operations workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}{active === "zoom" && <ZoomGuide />}{active === "coach" && <CoachGuide />}{active === "crisis" && <CrisisCenter workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}{active === "library" && <Library resources={workspace.resources} />}{active === "support" && <Support workspace={workspace} setWorkspace={setWorkspace} apiPatch={apiPatch} notify={setToast} />}</main>
+      <nav className="mobile-nav">{[navItems[0], navItems[1], navItems[2], navItems[6], navItems[7]].map((item) => <button key={item.id} className={active === item.id ? "active" : ""} onClick={() => moveTo(item.id)}><span>{item.code}</span>{item.label.replace("강사 ", "").replace("·수강생", "")}</button>)}</nav></section>{toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}</div>;
 }
 
-function PageHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
-  return <div className="page-heading"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>{action}</div>;
-}
+function PageHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) { return <div className="page-heading"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>{action}</div>; }
+function StatusBadge({ status }: { status: TaskStatus }) { const meta = statusMeta[status]; return <span className={`status-badge ${meta.tone}`}><i />{meta.label}</span>; }
 
-function StatusBadge({ status }: { status: TaskStatus }) {
-  const meta = statusMeta[status];
-  return <span className={`status-badge ${meta.tone}`}><i />{meta.label}</span>;
-}
-
-function HomeDashboard({ workspace, progress, nextTask, onToggle, onMove }: { workspace: Workspace; progress: number; nextTask: Task; onToggle: (task: Task) => void; onMove: (section: Section) => void }) {
+function HomeDashboard({ workspace, progress, nextTask, onMove }: { workspace: Workspace; progress: number; nextTask: Task; onMove: (section: Section) => void }) {
   const firstName = displayFirstName(workspace.user.displayName);
-  return (
-    <div className="page home-page">
-      <PageHeading eyebrow="TODAY · 2026. 07. 21" title={`안녕하세요, ${firstName} 강사님`} description="첫 무료강의까지 4일 남았어요. 오늘은 기획안 보완에 집중하면 됩니다." action={<button className="secondary-button" onClick={() => onMove("support")}>담당자에게 문의</button>} />
-      <section className="priority-card">
-        <div className="priority-copy">
-          <span className="priority-kicker"><i /> 지금 가장 먼저 할 일</span>
-          <h2>{nextTask.title}</h2>
-          <p>관리자 피드백 2건을 반영한 뒤 다시 검토를 요청해 주세요. 예상 소요 시간은 약 25분입니다.</p>
-          <div className="priority-meta"><span>마감 <strong>{nextTask.due_date}</strong></span><span>담당 <strong>{workspace.profile.manager_name}</strong></span><span>현재 <StatusBadge status={nextTask.status} /></span></div>
-          <button className="light-button" onClick={() => onMove(nextTask.stage === 4 ? "planner" : "roadmap")}>이어서 작성하기 <span aria-hidden="true">→</span></button>
-        </div>
-        <div className="progress-orbit" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><div><strong>{progress}%</strong><span>전체 여정</span></div></div>
-      </section>
-
-      <div className="dashboard-grid">
-        <section className="panel today-panel">
-          <div className="panel-head"><div><span className="section-index">01</span><h2>오늘의 체크리스트</h2></div><button className="text-button" onClick={() => onMove("roadmap")}>전체 보기 →</button></div>
-          <div className="task-list">
-            {workspace.tasks.slice(3, 6).map((task) => (
-              <div className="task-row" key={task.id}>
-                <button className={`check-control ${task.status === "done" ? "checked" : ""}`} onClick={() => onToggle(task)} aria-label={`${task.title} ${task.status === "done" ? "완료 취소" : "완료"}`}><span>✓</span></button>
-                <div className="task-copy"><strong>{task.title}</strong><span>{task.category} · {task.due_date}</span></div>
-                <StatusBadge status={task.status} />
-              </div>
-            ))}
-          </div>
-          <div className="feedback-note"><span className="feedback-avatar">이</span><div><strong>이수민 매니저의 피드백</strong><p>“기대 변화”를 수강생 행동으로 바꾸면 기획안이 훨씬 명확해질 것 같아요.</p></div><button onClick={() => onMove("planner")}>확인</button></div>
-        </section>
-
-        <aside className="panel status-panel">
-          <div className="panel-head"><div><span className="section-index">02</span><h2>내 강사 상태</h2></div><span className="grade-badge">{workspace.profile.grade}</span></div>
-          <dl className="profile-facts"><div><dt>계약 상태</dt><dd><span className="mini-check">✓</span>{workspace.profile.contract_status}</dd></div><div><dt>전문 분야</dt><dd>{workspace.profile.specialty}</dd></div><div><dt>정산 비율</dt><dd>{workspace.profile.settlement_rate}%</dd></div><div><dt>담당 관리자</dt><dd>{workspace.profile.manager_name}</dd></div></dl>
-          <a className="manager-contact" href={`mailto:${workspace.profile.manager_email}`}><span className="avatar small">이</span><div><strong>{workspace.profile.manager_name}</strong><span>{workspace.profile.manager_email}</span></div><b>메일</b></a>
-        </aside>
-      </div>
-
-      <section className="panel journey-panel">
-        <div className="panel-head"><div><span className="section-index">03</span><h2>나의 강사 여정</h2></div><span className="quiet-copy">7단계 중 {workspace.tasks.filter((task) => task.status === "done").length}단계 완료</span></div>
-        <div className="journey-track">
-          {workspace.tasks.map((task, index) => <button key={task.id} className={`journey-step ${task.status}`} onClick={() => onMove(index === 3 ? "planner" : "roadmap")}><span className="journey-dot">{task.status === "done" ? "✓" : task.stage}</span><strong>{task.category}</strong><small>{statusMeta[task.status].label}</small></button>)}
-        </div>
-      </section>
-
-      <div className="quick-grid">
-        <button className="quick-card cobalt" onClick={() => onMove("planner")}><span>기획안</span><strong>강의 기획안<br />이어서 작성</strong><b>→</b></button>
-        <button className="quick-card ivory" onClick={() => onMove("zoom")}><span>리허설</span><strong>Zoom 준비<br />체크하기</strong><b>→</b></button>
-        <button className="quick-card ivory" onClick={() => onMove("coach")}><span>수강생</span><strong>코치방 개설<br />가이드 보기</strong><b>→</b></button>
-        <button className="quick-card coral" onClick={() => onMove("crisis")}><span>긴급 지원</span><strong>위기 이슈<br />신고하기</strong><b>→</b></button>
-      </div>
-    </div>
-  );
+  return <div className="page home-page"><PageHeading eyebrow={`TODAY · ${new Intl.DateTimeFormat("ko-KR").format(new Date())}`} title={`안녕하세요, ${firstName} 강사님`} description="관리자가 전달한 단계별 안내와 답변을 확인하며 강사 준비를 진행하세요." action={<button className="secondary-button" onClick={() => onMove("support")}>매니저에게 문의</button>} />
+    <section className="priority-card"><div className="priority-copy"><span className="priority-kicker"><i /> 지금 가장 먼저 할 일</span><h2>{nextTask.title}</h2><p>로드맵에서 확인 내용과 자료를 살펴본 뒤 진행 상황을 공유해 주세요.</p><div className="priority-meta"><span>담당 <strong>매니저</strong></span><span>현재 <StatusBadge status={nextTask.status} /></span></div><button className="light-button" onClick={() => onMove(nextTask.stage === 4 ? "planner" : "roadmap")}>이어서 진행하기 →</button></div><div className="progress-orbit" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><div><strong>{progress}%</strong><span>전체 여정</span></div></div></section>
+    <div className="dashboard-grid"><section className="panel today-panel"><div className="panel-head"><div><span className="section-index">01</span><h2>최근 단계</h2></div><button className="text-button" onClick={() => onMove("roadmap")}>전체 보기 →</button></div><div className="task-list">{workspace.tasks.slice(0, 4).map((task) => <div className="task-row" key={task.id}><div className={`check-control ${task.status === "done" ? "checked" : ""}`}><span>✓</span></div><div className="task-copy"><strong>{task.title}</strong><span>{task.category}</span></div><StatusBadge status={task.status} /></div>)}</div>{workspace.plan.reviewerComment && <div className="feedback-note"><span className="feedback-avatar">매</span><div><strong>매니저의 기획안 코멘트</strong><p>{workspace.plan.reviewerComment}</p></div><button onClick={() => onMove("planner")}>확인</button></div>}</section><aside className="panel status-panel"><div className="panel-head"><div><span className="section-index">02</span><h2>내 강사 상태</h2></div><span className="grade-badge">{workspace.profile.grade}</span></div><dl className="profile-facts"><div><dt>계약 상태</dt><dd><span className="mini-check">✓</span>{workspace.profile.contract_status}</dd></div><div><dt>전문 분야</dt><dd>{workspace.profile.specialty}</dd></div><div><dt>정산 비율</dt><dd>{workspace.profile.settlement_rate}%</dd></div><div><dt>담당</dt><dd>매니저</dd></div></dl><div className="manager-contact"><span className="avatar small">매</span><div><strong>매니저</strong><span>문의·지원 메뉴에서 요청을 남겨 주세요.</span></div></div></aside></div>
+    <section className="panel journey-panel"><div className="panel-head"><div><span className="section-index">03</span><h2>나의 강사 여정</h2></div><span className="quiet-copy">7단계 중 {workspace.tasks.filter((t) => t.status === "done").length}단계 완료</span></div><div className="journey-track">{workspace.tasks.map((task) => <button key={task.id} className={`journey-step ${task.status}`} onClick={() => onMove(task.stage === 4 ? "planner" : "roadmap")}><span className="journey-dot">{task.status === "done" ? "✓" : task.stage}</span><strong>{task.category}</strong><small>{statusMeta[task.status].label}</small></button>)}</div></section></div>;
 }
 
-function Roadmap({ tasks, onToggle }: { tasks: Task[]; onToggle: (task: Task) => void }) {
+function Roadmap({ workspace, setWorkspace, apiPatch, onSetStatus, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (p: Record<string, unknown>) => Promise<Record<string, unknown>>; onSetStatus: (t: Task, s: TaskStatus) => void; notify: (m: string) => void }) {
+  const [open, setOpen] = useState(""); const [drafts, setDrafts] = useState<Record<string, { progressNote: string; question: string }>>({});
   const descriptions = ["프로필, 전문 분야, 계약·정산 정보를 확인합니다.", "채널 진단과 콘텐츠 개선 과제를 정리합니다.", "강의 스킬과 커리큘럼 구성 원칙을 익힙니다.", "기획안과 무료강의 자료를 완성하고 검토받습니다.", "OT와 Zoom 리허설을 통과해 운영을 검증합니다.", "코치방 운영 기록과 성공사례를 축적합니다.", "민원·위기 이슈의 1·2·3단계 대응을 익힙니다."];
-  return <div className="page"><PageHeading eyebrow="GROWTH ROADMAP" title="전문강사까지, 7단계로 준비합니다" description="각 단계의 완료 기준을 확인하고 하나씩 체크하세요. 검토가 필요한 단계는 담당 관리자가 함께 확인합니다." />
-    <div className="roadmap-summary"><div><strong>{tasks.filter((t) => t.status === "done").length}<span>/7</span></strong><p>완료한 단계</p></div><div className="roadmap-line"><i style={{ width: `${tasks.filter((t) => t.status === "done").length / 7 * 100}%` }} /></div><span>현재 <b>4. 강의 설계</b> 진행 중</span></div>
-    <div className="roadmap-list">{tasks.map((task) => <article className={`roadmap-card ${task.status}`} key={task.id}><div className="roadmap-number">{String(task.stage).padStart(2, "0")}</div><div className="roadmap-body"><div className="roadmap-title"><div><span>{task.category}</span><h2>{task.title}</h2></div><StatusBadge status={task.status} /></div><p>{descriptions[task.stage - 1]}</p><div className="roadmap-actions"><button className="secondary-button">학습하기</button><button className="secondary-button">자료 다운로드</button><button className="secondary-button">과제 제출</button><button className={`complete-button ${task.status === "done" ? "done" : ""}`} onClick={() => onToggle(task)}>{task.status === "done" ? "✓ 완료됨" : "완료 체크"}</button></div><footer><span>완료 기준</span><strong>{task.stage === 4 ? "관리자 검토 승인" : task.stage === 5 ? "리허설 통과" : "필수 항목 확인 및 제출"}</strong><small>마감 {task.due_date}</small></footer></div></article>)}</div>
-  </div>;
+  const share = async (task: Task) => { const draft = drafts[task.id] ?? { progressNote: "", question: "" }; try { const result = await apiPatch({ action: "shareProgress", taskId: task.id, ...draft }); const update: ProgressUpdate = { id: String(result.id), task_id: task.id, progress_note: draft.progressNote, question: draft.question, admin_reply: null, created_at: new Date().toISOString(), replied_at: null }; setWorkspace((w) => ({ ...w, tasks: w.tasks.map((t) => t.id === task.id ? { ...t, status: "review" } : t), progressUpdates: [update, ...w.progressUpdates] })); setDrafts((d) => ({ ...d, [task.id]: { progressNote: "", question: "" } })); notify("진행 내용을 관리자에게 공유했습니다."); } catch (e) { notify(e instanceof Error ? e.message : "공유하지 못했습니다."); } };
+  return <div className="page"><PageHeading eyebrow="GROWTH ROADMAP" title="전문강사까지, 7단계로 준비합니다" description="관리자가 단계별로 전달한 확인 내용과 자료를 보고, 진행 과정과 질문을 공유하세요." /><div className="roadmap-summary"><div><strong>{workspace.tasks.filter((t) => t.status === "done").length}<span>/7</span></strong><p>완료한 단계</p></div><div className="roadmap-line"><i style={{ width: `${workspace.tasks.filter((t) => t.status === "done").length / 7 * 100}%` }} /></div><span>진행 공유는 관리자 답변과 함께 보관됩니다.</span></div>
+    <div className="roadmap-list">{workspace.tasks.map((task) => { const stageResources = workspace.resources.filter((r) => r.placement === "roadmap" && Number(r.stage) === task.stage); const updates = workspace.progressUpdates.filter((u) => u.task_id === task.id); const mode = open.startsWith(`${task.id}:`) ? open.split(":")[1] : ""; const draft = drafts[task.id] ?? { progressNote: "", question: "" }; return <article className={`roadmap-card ${task.status}`} key={task.id}><div className="roadmap-number">{String(task.stage).padStart(2, "0")}</div><div className="roadmap-body"><div className="roadmap-title"><div><span>{task.category}</span><h2>{task.title}</h2></div><StatusBadge status={task.status} /></div><p>{descriptions[task.stage - 1]}</p><div className="roadmap-actions"><button className="secondary-button" onClick={() => setOpen(mode === "confirm" ? "" : `${task.id}:confirm`)}>확인하기</button><button className="secondary-button" onClick={() => setOpen(mode === "files" ? "" : `${task.id}:files`)}>자료 다운로드</button><button className="secondary-button" onClick={() => setOpen(mode === "share" ? "" : `${task.id}:share`)}>진행 공유</button><button className="wait-button" onClick={() => onSetStatus(task, "not_started")}>진행 대기</button><button className={`complete-button ${task.status === "done" ? "done" : ""}`} onClick={() => onSetStatus(task, "done")}>{task.status === "done" ? "✓ 완료됨" : "완료 체크"}</button></div>
+      {mode === "confirm" && <div className="roadmap-detail"><h3>매니저가 확인 요청한 내용</h3>{stageResources.length ? stageResources.map((r) => <article key={r.id}><strong>{r.title}</strong><p>{r.request_note || "첨부 자료를 확인해 주세요."}</p>{r.delivery_type === "link" && <a href={`/api/resources/${r.id}`} target="_blank">관련 링크 열기 →</a>}</article>) : <div className="inline-empty">아직 등록된 확인 내용이 없습니다.</div>}</div>}
+      {mode === "files" && <div className="roadmap-detail"><h3>단계별 자료</h3>{stageResources.filter((r) => r.delivery_type !== "text").length ? stageResources.filter((r) => r.delivery_type !== "text").map((r) => <article key={r.id}><div><strong>{r.title}</strong><p>{r.request_note}</p></div><a href={`/api/resources/${r.id}`} target="_blank">{r.delivery_type === "file" ? "다운로드 ↓" : "링크 열기 ↗"}</a></article>) : <div className="inline-empty">아직 전달된 파일이나 링크가 없습니다.</div>}</div>}
+      {mode === "share" && <div className="roadmap-detail progress-share"><h3>진행 과정 공유</h3><label><span>어떻게 진행했나요?</span><textarea rows={3} value={draft.progressNote} onChange={(e) => setDrafts((d) => ({ ...d, [task.id]: { ...draft, progressNote: e.target.value } }))} placeholder="수행한 내용과 결과를 구체적으로 적어 주세요." /></label><label><span>문의 사항</span><textarea rows={2} value={draft.question} onChange={(e) => setDrafts((d) => ({ ...d, [task.id]: { ...draft, question: e.target.value } }))} placeholder="막힌 부분이나 확인이 필요한 내용을 적어 주세요." /></label><button className="primary-button" onClick={() => void share(task)}>관리자에게 공유하기</button>{updates.map((u) => <article className="progress-thread" key={u.id}><span>{formatDate(u.created_at)} 공유</span><p>{u.progress_note}</p>{u.question && <p><b>문의</b> {u.question}</p>}{u.admin_reply && <div><strong>매니저 답변</strong><p>{u.admin_reply}</p></div>}</article>)}</div>}
+      <footer><span>완료 기준</span><strong>{task.stage === 4 ? "관리자 검토 승인" : task.stage === 5 ? "리허설 통과" : "필수 내용 확인 및 진행 공유"}</strong></footer></div></article>; })}</div></div>;
 }
 
-function Planner({ workspace, setWorkspace, apiPatch, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (payload: Record<string, unknown>) => Promise<unknown>; notify: (message: string) => void }) {
-  const [step, setStep] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const content = workspace.plan.content;
-  const update = (key: string, value: string) => setWorkspace((current) => ({ ...current, plan: { ...current.plan, content: { ...current.plan.content, [key]: value } } }));
-  const save = async (submit = false) => { setSaving(true); try { await apiPatch({ action: submit ? "submitPlan" : "savePlan", content }); setWorkspace((current) => ({ ...current, plan: { ...current.plan, status: submit ? "review" : "draft" } })); notify(submit ? "관리자에게 검토를 요청했어요." : "기획안을 안전하게 저장했어요."); } catch (error) { notify(error instanceof Error ? error.message : "저장하지 못했습니다."); } finally { setSaving(false); } };
+function Planner({ workspace, setWorkspace, apiPatch, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (p: Record<string, unknown>) => Promise<Record<string, unknown>>; notify: (m: string) => void }) {
+  const [step, setStep] = useState(0); const [saving, setSaving] = useState(false); const content = workspace.plan.content;
+  const update = (key: string, value: string) => setWorkspace((w) => ({ ...w, plan: { ...w.plan, content: { ...w.plan.content, [key]: value } } }));
+  const save = async (submit = false) => { setSaving(true); try { await apiPatch({ action: submit ? "submitPlan" : "savePlan", content }); setWorkspace((w) => ({ ...w, plan: { ...w.plan, status: submit ? "review" : "draft" } })); notify(submit ? "관리자에게 검토를 요청했습니다." : "기획안을 저장했습니다."); } catch (e) { notify(e instanceof Error ? e.message : "저장하지 못했습니다."); } finally { setSaving(false); } };
   const fieldSets = [
-    [{ key: "courseTitle", label: "강의명", placeholder: "예: 반복 업무를 줄이는 AI 자동화 실전" }, { key: "audience", label: "대상 수강생", placeholder: "예: 생성형 AI를 처음 업무에 적용하는 실무자" }, { key: "format", label: "강의 형태·시간·정원", placeholder: "무료강의 · 90분 · 최대 70명" }, { key: "expertise", label: "강사의 전문성과 경험", placeholder: "이 강의를 진행할 수 있는 실제 경험과 근거를 적어 주세요." }],
-    [{ key: "currentSituation", label: "수강생의 현재 상황", placeholder: "지금 어떤 상황에서 무엇을 어려워하나요?" }, { key: "painPoint", label: "해결하려는 핵심 불편", placeholder: "강의를 듣지 않으면 계속되는 불편을 구체적으로 적어 주세요." }, { key: "expectedChange", label: "기대 변화", placeholder: "수강 후 가능한 변화를 과장 없이 적어 주세요." }],
-    [{ key: "goals", label: "수강 후 가능한 행동 3가지", placeholder: "1. 업무를 분류한다\n2. 적합한 도구를 선택한다\n3. 자동화 흐름을 직접 만든다" }, { key: "deliverable", label: "측정 가능한 결과물", placeholder: "예: 본인 업무용 자동화 시나리오 1개" }],
-    [{ key: "curriculum", label: "회차별 커리큘럼", placeholder: "회차 / 주제 / 핵심 내용 / 실습 / 과제 / 준비물 / 시간" }, { key: "practice", label: "수강생 직접 실습", placeholder: "강사 시연이 아닌 수강생 실행 과제를 적어 주세요." }],
-    [{ key: "freeFlow", label: "무료강의 흐름", placeholder: "강사 소개·공감 → 핵심 개념 → 실전 시연 → 질문 → 심화과정 안내" }, { key: "valueBoundary", label: "무료·본강의 가치 구분", placeholder: "무료강의에서 제공할 가치와 본강의 심화 범위를 구분해 주세요." }],
-    [{ key: "zoomPlan", label: "Zoom 운영 준비", placeholder: "화면 공유, 참여 방식, 질의응답, 녹화 여부를 적어 주세요." }, { key: "notice", label: "사전·사후 안내", placeholder: "24시간 전, 1시간 전, 종료 후 안내 내용을 적어 주세요." }],
-    [{ key: "coachRoom", label: "코치방 운영 기준", placeholder: "운영 시간, 질문 응답 기준, 과제 피드백 방식을 적어 주세요." }, { key: "feedback", label: "과제·피드백", placeholder: "제출 방식, 마감, 피드백 기준" }],
-    [{ key: "evidence", label: "성과 표현의 근거", placeholder: "사용할 사례와 확인 가능한 근거를 적어 주세요." }, { key: "riskCheck", label: "저작권·개인정보·과장 표현 점검", placeholder: "개인차 명시, 결과 보장 금지, 사용 자료의 권리 확인" }],
+    [{ key: "courseTitle", label: "강의명", placeholder: "예: 반복 업무를 줄이는 AI 자동화 실전" }, { key: "audience", label: "대상 수강생", placeholder: "수강 대상을 구체적으로 적어 주세요." }, { key: "format", label: "강의 형태·시간·정원", placeholder: "무료강의 · 90분 · 최대 70명" }],
+    [{ key: "currentSituation", label: "수강생의 현재 상황", placeholder: "현재의 어려움" }, { key: "painPoint", label: "핵심 불편", placeholder: "해결할 불편" }, { key: "expectedChange", label: "기대 변화", placeholder: "수강 후 변화" }],
+    [{ key: "goals", label: "수강 후 가능한 행동", placeholder: "행동 목표 3가지" }, { key: "deliverable", label: "측정 가능한 결과물", placeholder: "실제 결과물" }],
+    [{ key: "curriculum", label: "회차별 커리큘럼", placeholder: "회차 / 주제 / 실습 / 과제 / 시간" }, { key: "practice", label: "직접 실습", placeholder: "수강생 실행 과제" }],
+    [{ key: "freeFlow", label: "무료강의 흐름", placeholder: "소개 → 개념 → 시연 → 질문" }, { key: "valueBoundary", label: "무료·본강의 구분", placeholder: "각 강의의 범위" }],
+    [{ key: "zoomPlan", label: "Zoom 운영 준비", placeholder: "화면 공유, 질의응답, 녹화" }, { key: "notice", label: "사전·사후 안내", placeholder: "안내 시점과 내용" }],
+    [{ key: "coachRoom", label: "코치방 운영 기준", placeholder: "운영 시간과 응답 기준" }, { key: "feedback", label: "진행 공유·피드백", placeholder: "공유 방식과 피드백 기준" }],
+    [{ key: "evidence", label: "성과 표현 근거", placeholder: "확인 가능한 근거" }, { key: "riskCheck", label: "저작권·개인정보·과장 표현", placeholder: "점검 결과" }],
   ];
-  const completion = Math.round(Object.values(content).filter(Boolean).length / 19 * 100);
-  return <div className="page planner-page"><PageHeading eyebrow="LESSON PLANNER" title="강의 기획안 만들기" description="좋은 강의가 되기 위한 질문에 답하면, 검토 가능한 기획안이 완성됩니다." action={<div className="version-chip">v{workspace.plan.version} · {workspace.plan.status === "review" ? "검토 대기" : "작성 중"}</div>} />
-    <div className="planner-layout"><aside className="plan-steps"><div className="plan-progress"><strong>{completion}%</strong><span>작성 진행률</span><div><i style={{ width: `${completion}%` }} /></div></div>{planSteps.map((label, index) => <button key={label} className={step === index ? "active" : ""} onClick={() => setStep(index)}><span>{index + 1}</span><div><strong>{label}</strong><small>{index < step ? "작성 완료" : index === step ? "작성 중" : "미작성"}</small></div></button>)}</aside>
-      <section className="plan-editor"><div className="editor-head"><span>STEP {step + 1}</span><h2>{planSteps[step]}</h2><p>{step === 0 ? "수강생이 처음 보아도 강의의 대상과 가치를 이해할 수 있게 적어 주세요." : "구체적인 상황과 실제 행동을 중심으로 작성해 주세요."}</p></div><div className="form-stack">{fieldSets[step].map((field) => <label key={field.key}><span>{field.label}<b>필수</b></span>{field.key === "goals" || field.key === "curriculum" || field.key === "freeFlow" ? <textarea value={content[field.key] ?? ""} onChange={(e) => update(field.key, e.target.value)} placeholder={field.placeholder} rows={5} /> : <input value={content[field.key] ?? ""} onChange={(e) => update(field.key, e.target.value)} placeholder={field.placeholder} />}</label>)}</div><div className="editor-actions"><button className="secondary-button" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}>이전</button><button className="primary-button" onClick={() => step === 7 ? save(false) : setStep((value) => Math.min(7, value + 1))}>{step === 7 ? "임시저장" : "저장하고 다음"} →</button></div></section>
-      <aside className="writing-guide"><div className="guide-card good"><span>좋은 작성 예</span><p>“수강생이 본인의 반복 업무 1개를 골라 자동화 순서도를 완성한다.”</p></div><div className="guide-card warning"><span>주의할 표현</span><p>“누구나 월 1,000만 원”처럼 근거 없는 수익·성과 보장 표현은 사용할 수 없어요.</p></div><div className="guide-check"><h3>검토 체크리스트</h3>{["행동 중심 목표인가요?", "실습 산출물이 있나요?", "개인차를 명시했나요?", "저작권을 확인했나요?"].map((item, index) => <div key={item}><span>{index < 2 ? "✓" : ""}</span>{item}</div>)}</div>{workspace.plan.reviewerComment && <div className="review-comment"><span>관리자 코멘트</span><p>{workspace.plan.reviewerComment}</p></div>}</aside></div>
-    <div className="planner-footer"><div><span>자동 저장</span><strong>{workspace.plan.updatedAt ? "최근 저장됨" : "새 기획안"}</strong></div><div><button className="secondary-button" onClick={() => notify("미리보기 화면을 준비했어요.")}>미리보기</button><button className="secondary-button" onClick={() => window.print()}>PDF로 저장</button><button className="primary-button" disabled={saving} onClick={() => save(true)}>{saving ? "요청 중…" : "관리자 검토 요청"}</button></div></div>
-  </div>;
+  const completion = Math.round(Object.values(content).filter(Boolean).length / 17 * 100);
+  return <div className="page planner-page"><PageHeading eyebrow="LESSON PLANNER" title="강의 기획안 만들기" description="입력한 기획안은 관리자 페이지의 강사별 검토 화면과 실시간으로 연결됩니다." action={<div className="version-chip">v{workspace.plan.version} · {workspace.plan.status === "approved" ? "승인" : workspace.plan.status === "review" ? "검토 대기" : workspace.plan.status === "revision" ? "보완 필요" : "작성 중"}</div>} /><div className="planner-layout"><aside className="plan-steps"><div className="plan-progress"><strong>{completion}%</strong><span>작성 진행률</span><div><i style={{ width: `${completion}%` }} /></div></div>{planSteps.map((label, i) => <button key={label} className={step === i ? "active" : ""} onClick={() => setStep(i)}><span>{i + 1}</span><div><strong>{label}</strong><small>{i === step ? "작성 중" : content[fieldSets[i][0].key] ? "작성됨" : "미작성"}</small></div></button>)}</aside><section className="plan-editor"><div className="editor-head"><span>STEP {step + 1}</span><h2>{planSteps[step]}</h2><p>구체적인 상황과 실제 행동을 중심으로 작성해 주세요.</p></div><div className="form-stack">{fieldSets[step].map((f) => <label key={f.key}><span>{f.label}<b>필수</b></span>{["goals", "curriculum", "freeFlow"].includes(f.key) ? <textarea rows={5} value={content[f.key] ?? ""} onChange={(e) => update(f.key, e.target.value)} placeholder={f.placeholder} /> : <input value={content[f.key] ?? ""} onChange={(e) => update(f.key, e.target.value)} placeholder={f.placeholder} />}</label>)}</div><div className="editor-actions"><button className="secondary-button" disabled={step === 0} onClick={() => setStep((v) => Math.max(0, v - 1))}>이전</button><button className="primary-button" onClick={() => step === 7 ? void save(false) : setStep((v) => Math.min(7, v + 1))}>{step === 7 ? "임시저장" : "저장하고 다음"} →</button></div></section><aside className="writing-guide"><div className="guide-check active-checklist"><h3>관리자 검토 체크리스트</h3>{reviewChecks.map((item) => <div key={item.key} className={workspace.plan.reviewChecklist[item.key] ? "checked" : ""}><span>{workspace.plan.reviewChecklist[item.key] ? "✓" : ""}</span>{item.label}</div>)}</div>{workspace.plan.reviewerComment ? <div className="review-comment"><span>매니저 코멘트</span><p>{workspace.plan.reviewerComment}</p></div> : <div className="guide-card good"><span>검토 전</span><p>검토를 요청하면 매니저의 체크 결과와 코멘트가 여기에 표시됩니다.</p></div>}</aside></div><div className="planner-footer"><div><span>저장 상태</span><strong>{workspace.plan.updatedAt ? "최근 저장됨" : "새 기획안"}</strong></div><div><button className="secondary-button" onClick={() => window.print()}>PDF로 저장</button><button className="primary-button" disabled={saving} onClick={() => void save(true)}>{saving ? "요청 중…" : "관리자 검토 요청"}</button></div></div></div>;
 }
 
-function Operations({ notify }: { notify: (message: string) => void }) {
-  const [tab, setTab] = useState<"before" | "during" | "after">("before");
-  const groups = {
-    before: ["강의기획안·자료·회차별 목표 최종 확인", "신청자 명단·코치방·Zoom 링크 확인", "화면 공유 자료·데모 계정 준비", "음향·카메라·인터넷 사전 테스트", "저작권·개인정보·수익 보장 표현 점검", "24시간 전·1시간 전 안내 발송"],
-    during: ["입장 확인 및 시작 안내", "목표·순서·질문 방법 고지", "실습과 채팅 질문으로 참여 유도", "핵심 내용과 질의응답 시간 관리", "장애 발생 시 대체 안내문 공지", "불만은 공개 논쟁 대신 기록 후 협의"],
-    after: ["자료·녹화본 제공 정책 안내", "과제와 다음 회차 준비물 공지", "출결·질문·주요 피드백 기록", "개선 사항과 성공사례 후보 기록", "정산에 필요한 완료 기록 확인"],
-  };
-  const [checked, setChecked] = useState<string[]>([]);
-  return <div className="page"><PageHeading eyebrow="OPERATION MANUAL" title="강의 전·중·후, 빠짐없이 운영하세요" description="필요한 순간에 바로 실행할 수 있도록 준비물, 실행 순서, 완료 기준을 나눴습니다." />
-    <div className="phase-tabs">{(["before", "during", "after"] as const).map((id, index) => <button className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}><span>{index + 1}</span><div><strong>강의 {id === "before" ? "전" : id === "during" ? "중" : "후"}</strong><small>{id === "before" ? "준비와 사전 점검" : id === "during" ? "진행과 참여 관리" : "기록과 후속 안내"}</small></div></button>)}</div>
-    <div className="manual-layout"><section className="panel manual-checks"><div className="panel-head"><div><span className="section-index">CHECK</span><h2>{tab === "before" ? "강의 시작 전 최종 점검" : tab === "during" ? "수업 진행 체크" : "강의 종료 후 기록"}</h2></div><span className="quiet-copy">{groups[tab].filter((item) => checked.includes(`${tab}:${item}`)).length}/{groups[tab].length} 완료</span></div>{groups[tab].map((item, index) => { const key = `${tab}:${item}`; const active = checked.includes(key); return <button className={`manual-row ${active ? "done" : ""}`} key={item} onClick={() => setChecked((list) => active ? list.filter((value) => value !== key) : [...list, key])}><span>{active ? "✓" : index + 1}</span><div><strong>{item}</strong><small>{index % 2 === 0 ? "완료 기준을 확인하고 체크해 주세요." : "운영진과 공유가 필요한 항목입니다."}</small></div><b>{active ? "완료" : "체크"}</b></button>; })}<button className="primary-button full" onClick={() => notify("현재 체크 상태를 저장했어요.")}>현재 상태 저장하기</button></section>
-      <aside className="manual-side"><div className="dark-card"><span>문제 발생 시</span><h3>기술 장애는<br />3단계로 대응합니다</h3><ol><li><b>1</b>원인과 영향 범위 확인</li><li><b>2</b>대체 링크·자료 즉시 안내</li><li><b>3</b>관리자에게 기록 공유</li></ol><button onClick={() => notify("대체 안내문을 복사했어요.")}>대체 안내문 복사</button></div><div className="tip-card"><span>운영 TIP</span><p>질의응답 시간을 먼저 확보한 뒤 나머지 콘텐츠 분량을 조절하면 종료 시간이 안정적이에요.</p></div></aside></div>
-  </div>;
+function Operations({ workspace, setWorkspace, apiPatch, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (p: Record<string, unknown>) => Promise<Record<string, unknown>>; notify: (m: string) => void }) {
+  const [form, setForm] = useState({ courseTitle: "", freeLectureDate: "", curriculumDate: "" }); const [tab, setTab] = useState<"before" | "during" | "after">("before"); const [checked, setChecked] = useState<string[]>([]);
+  const groups = { before: ["강의기획안·자료·회차별 목표 최종 확인", "신청자 명단·코치방·Zoom 링크 확인", "화면 공유 자료·데모 계정 준비", "음향·카메라·인터넷 사전 테스트", "저작권·개인정보 표현 점검", "24시간 전·1시간 전 안내 발송"], during: ["입장 확인 및 시작 안내", "목표·순서·질문 방법 고지", "실습과 채팅 질문으로 참여 유도", "핵심 내용과 질의응답 시간 관리", "장애 시 대체 안내 즉시 공지"], after: ["자료·녹화본 제공 정책 안내", "다음 회차 준비물 공지", "출결·질문·피드백 기록", "개선 사항과 성공사례 기록"] };
+  const create = async () => { try { const result = await apiPatch({ action: "createCourseRun", ...form }); const run: CourseRun = { id: String(result.id), course_title: form.courseTitle, free_lecture_date: form.freeLectureDate, curriculum_date: form.curriculumDate, created_at: new Date().toISOString() }; setWorkspace((w) => ({ ...w, courseRuns: [run, ...w.courseRuns] })); setForm({ courseTitle: "", freeLectureDate: "", curriculumDate: "" }); notify("강의 일정별 운영판을 생성했습니다."); } catch (e) { notify(e instanceof Error ? e.message : "생성하지 못했습니다."); } };
+  return <div className="page"><PageHeading eyebrow="OPERATION MANUAL" title="강의 일정별 운영판을 만드세요" description="무료강의와 커리큘럼 날짜를 등록하면 반복 강의도 일정별로 구분해 관리할 수 있습니다." /><section className="run-builder panel"><div><span className="section-index">NEW RUN</span><h2>새 강의 일정 생성</h2></div><label><span>강의명</span><input value={form.courseTitle} onChange={(e) => setForm({ ...form, courseTitle: e.target.value })} placeholder="강의명을 입력하세요" /></label><label><span>무료강의 날짜</span><input type="date" value={form.freeLectureDate} onChange={(e) => setForm({ ...form, freeLectureDate: e.target.value })} /></label><label><span>커리큘럼 시작 날짜</span><input type="date" value={form.curriculumDate} onChange={(e) => setForm({ ...form, curriculumDate: e.target.value })} /></label><button className="primary-button" onClick={() => void create()}>운영 일정 생성</button></section>{workspace.courseRuns.length > 0 && <div className="course-run-grid">{workspace.courseRuns.map((run) => <article key={run.id}><span>LECTURE RUN</span><h3>{run.course_title}</h3><div><b>무료강의</b><time>{run.free_lecture_date}</time></div><div><b>커리큘럼 시작</b><time>{run.curriculum_date}</time></div></article>)}</div>}<div className="phase-tabs">{(["before", "during", "after"] as const).map((id, i) => <button className={tab === id ? "active" : ""} onClick={() => setTab(id)} key={id}><span>{i + 1}</span><div><strong>강의 {id === "before" ? "전" : id === "during" ? "중" : "후"}</strong><small>{id === "before" ? "준비와 점검" : id === "during" ? "진행과 참여" : "기록과 후속"}</small></div></button>)}</div><section className="panel manual-checks"><div className="panel-head"><h2>단계별 체크리스트</h2><span className="quiet-copy">{groups[tab].filter((x) => checked.includes(`${tab}:${x}`)).length}/{groups[tab].length}</span></div>{groups[tab].map((item, i) => { const key = `${tab}:${item}`; const done = checked.includes(key); return <button className={`manual-row ${done ? "done" : ""}`} key={item} onClick={() => setChecked((list) => done ? list.filter((x) => x !== key) : [...list, key])}><span>{done ? "✓" : i + 1}</span><div><strong>{item}</strong><small>완료 기준을 확인하고 체크하세요.</small></div><b>{done ? "완료" : "체크"}</b></button>; })}</section></div>;
 }
 
-function ZoomGuide({ notify }: { notify: (message: string) => void }) {
+function ZoomGuide() {
   const [open, setOpen] = useState(0);
-  const faq = [{ q: "소리가 들리지 않아요", a: "마이크 입력 장치와 컴퓨터 소리 공유를 확인합니다. 해결되지 않으면 채팅으로 재접속 링크를 안내하고 공동호스트에게 진행을 맡깁니다." }, { q: "화면 공유가 되지 않아요", a: "호스트의 화면 공유 권한과 운영체제 권한을 확인합니다. 즉시 해결이 어렵다면 자료 링크를 채팅과 코치방에 공유합니다." }, { q: "수강생이 입장하지 못해요", a: "회의 ID·암호·대기실 승인 여부를 확인합니다. 5분 이상 지속되면 관리자에게 참석자 정보와 증상을 전달합니다." }, { q: "녹화 제공 문의가 있어요", a: "사전에 고지한 녹화 정책과 개인정보 동의 범위를 확인한 뒤 동일한 기준으로 안내합니다." }];
-  return <div className="page"><PageHeading eyebrow="ZOOM PLAYBOOK" title="Zoom 리허설, 화면 순서대로 따라하세요" description="강의 시작 20분 전부터 종료 안내까지 실제 운영 순서로 정리했습니다." action={<span className="date-pill">다음 리허설 · 7월 23일 15:00</span>} />
-    <section className="zoom-hero"><div><span>20 MIN BEFORE</span><h2>리허설 방에 먼저 입장해<br />장비와 권한을 확인하세요.</h2><p>공동호스트와 입장·화면공유·채팅 권한을 한 번씩 실행하면 대부분의 현장 문제를 예방할 수 있어요.</p><button className="light-button" onClick={() => notify("리허설 체크를 시작했어요.")}>리허설 체크 시작 →</button></div><div className="zoom-window" aria-hidden="true"><div className="window-bar"><i /><i /><i /><span>UhB · 강의 리허설</span></div><div className="speaker-box"><span>UhB</span><strong>카메라 프레임</strong></div><div className="window-controls"><span>MIC</span><span>CAM</span><span>SHARE</span><b>END</b></div></div></section>
-    <div className="guide-columns"><section><span className="section-index">01 · 준비</span><h2>강사 준비 체크리스트</h2>{["Zoom 계정과 최신 앱", "회의명·대기실·암호", "호스트·공동호스트 권한", "화면·컴퓨터 소리 공유", "카메라·마이크·조명", "채팅·녹화·이름 정책"].map((item, index) => <div className="number-check" key={item}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item}</strong><i>확인</i></div>)}</section><section><span className="section-index">02 · 운영</span><h2>수업 운영 절차</h2><ol className="vertical-steps">{["15~20분 전 입장 및 장비 점검", "공동호스트와 권한 리허설", "입장 시 이름·음소거·질문 안내", "자료 공유와 실습 전환 확인", "문제 시 대체 링크 즉시 공지", "종료 전 다음 회차·과제 안내"].map((item, index) => <li key={item}><span>{index + 1}</span><div><strong>{item}</strong><small>{index === 4 ? "채팅과 코치방 모두 공지" : "완료 후 다음 단계로 이동"}</small></div></li>)}</ol></section></div>
-    <section className="faq-section"><div className="section-title"><span className="section-index">03 · 문제 해결</span><h2>자주 발생하는 상황</h2></div>{faq.map((item, index) => <div className={`faq-row ${open === index ? "open" : ""}`} key={item.q}><button onClick={() => setOpen(open === index ? -1 : index)}><span>0{index + 1}</span><strong>{item.q}</strong><b>{open === index ? "−" : "+"}</b></button>{open === index && <div><p>{item.a}</p><button onClick={() => notify("수강생 안내 문구를 복사했어요.")}>안내 문구 복사</button></div>}</div>)}</section>
-  </div>;
+  const steps = [
+    { title: "설정 화면 열기", path: "홈 화면 › 톱니바퀴(설정)", text: "바탕화면의 Zoom 아이콘을 실행하고 홈 화면의 설정 버튼을 누릅니다. 회의실에서는 좌측 상단 ‘회의 정보’에서 설정으로 이동할 수 있습니다.", screen: "ZOOM HOME", hint: "⚙ 설정" },
+    { title: "일반(General)", path: "설정 › 일반", text: "기본값을 유지하되 듀얼 모니터를 쓴다면 ‘듀얼 모니터 사용’을 켭니다. 반응 이모티콘 피부색도 여기서 원하는 색으로 정합니다.", screen: "GENERAL", hint: "□ 듀얼 모니터 사용" },
+    { title: "비디오(Video)", path: "설정 › 비디오", text: "얼굴이 보이지 않으면 카메라 목록에서 내장 캠 또는 외장 웹캠을 선택합니다. 내 모습 수정 필터와 밝기 자동 조정을 확인합니다.", screen: "VIDEO", hint: "카메라 ▾  ·  밝기 자동" },
+    { title: "오디오(Audio)", path: "설정 › 오디오", text: "스피커와 마이크를 각각 선택하고 두 테스트 버튼을 실행합니다. 음악 강의는 ‘원음 켜기’를 활성화하고 원음용 마이크를 지정합니다.", screen: "AUDIO", hint: "스피커 테스트  |  마이크 테스트" },
+    { title: "화면 공유(Share Screen)", path: "설정 › 화면 공유", text: "기본 체크 상태를 훑어보고 공유 화면 선택 방식과 창 크기 동작을 확인합니다. 강의 전에 자료와 컴퓨터 소리 공유를 한 번 실행합니다.", screen: "SHARE SCREEN", hint: "공유 창 선택  ·  소리 공유" },
+    { title: "채팅(Chat)", path: "설정 › 팀 채팅", text: "호스트가 질문을 놓치지 않도록 ‘읽지 않은 메시지 배지 표시’를 켭니다. 새 메시지 표시가 실제로 뜨는지 확인합니다.", screen: "CHAT", hint: "✓ 읽지 않은 메시지 배지" },
+    { title: "배경 및 필터", path: "설정 › 배경 및 효과", text: "가상 배경은 + 버튼으로 이미지나 비디오를 추가합니다. 비디오 필터는 ‘없음’으로 해제할 수 있고 스튜디오 효과 지원 여부는 PC 사양에 따라 다릅니다.", screen: "BACKGROUND", hint: "+ 배경 추가  ·  필터 없음" },
+    { title: "녹화(Recording)", path: "설정 › 녹화", text: "로컬 녹화 위치 옆 ‘열기’로 저장 폴더를 확인합니다. ‘변경’을 눌러 바탕화면의 전용 폴더를 지정하고 테스트 녹화 파일이 저장되는지 확인합니다.", screen: "RECORDING", hint: "저장 위치  [열기] [변경]" },
+  ];
+  return <div className="page"><PageHeading eyebrow="ZOOM SETTINGS" title="처음이어도 헷갈리지 않는 Zoom 설정" description="0단계부터 7단계까지, 문제 상황과 확인할 화면을 같은 순서로 정리했습니다." /><div className="zoom-step-list">{steps.map((item, i) => <article className={open === i ? "open" : ""} key={item.title}><button onClick={() => setOpen(open === i ? -1 : i)}><span>{i}</span><div><small>{item.path}</small><strong>{item.title}</strong></div><b>{open === i ? "−" : "+"}</b></button>{open === i && <div className="zoom-step-detail"><div><h3>{i === 2 ? "얼굴이 안 보일 때" : i === 3 ? "소리가 안 들릴 때" : "이 화면에서 확인하세요"}</h3><p>{item.text}</p><div className="zoom-caution">설정 변경 후에는 실제 회의실에 입장해 한 번 더 테스트하세요.</div></div><div className="zoom-setting-shot" aria-label={`${item.title} 화면 예시`}><header><i /><i /><i /><strong>{item.screen}</strong></header><main><span>Settings</span><h4>{item.title}</h4><div className="shot-preview">{i === 2 ? <span className="camera-person">강사 화면</span> : <span>{item.hint}</span>}</div><p>{item.hint}</p><button>확인</button></main></div></div>}</article>)}</div></div>;
 }
 
-function CoachGuide({ notify }: { notify: (message: string) => void }) {
-  const steps = ["대화 아이콘 선택", "그룹채팅 선택", "커버 이미지 설정", "방 이름 입력", "설명·주제 작성", "프로필 참여 설정", "참여 코드 설정", "관리자에게 인증 제출"];
-  const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); notify("표준 문구를 복사했어요."); } catch { notify("문구를 선택해 복사해 주세요."); } };
-  return <div className="page"><PageHeading eyebrow="COACH ROOM" title="코치방 개설부터 종강까지" description="카카오 오픈채팅 개설 순서와 수강생 운영 기준을 한 화면에서 확인하세요." />
-    <section className="coach-intro"><div><span>8 STEPS</span><h2>약 10분이면<br />표준 코치방을 만들 수 있어요.</h2><p>방 이름과 설명, 참여 코드, 고정 공지를 먼저 준비해 두면 더 빠릅니다.</p></div><div className="coach-rule"><span>권장 인원</span><strong>60–70명</strong><small>강의 성격에 따라 관리자와 조정</small></div></section>
-    <div className="coach-layout"><section className="phone-steps"><div className="mock-phone"><div className="phone-top"><span>9:41</span><b>● ●</b></div><div className="chat-preview"><i>UhB</i><strong>[AI 실무 1기] 김어비_코칭방</strong><span>질문 가능 시간 · 평일 10:00–18:00</span><div className="chat-note">공지 · Zoom 링크와 과제 제출 양식을 확인해 주세요.</div></div></div><div className="steps-grid">{steps.map((item, index) => <button key={item} onClick={() => notify(`${index + 1}단계 완료로 표시했어요.`)}><span>{index + 1}</span><strong>{item}</strong><i>체크</i></button>)}</div></section>
-      <aside className="coach-copy"><h2>표준 설정</h2>{[{ label: "방 이름", text: "[AI 실무 1기] 김어비_코칭방" }, { label: "방 설명", text: "운영 기간과 질문 가능 시간을 확인해 주세요. 개인 연락처·광고·비방은 금지합니다." }, { label: "고정 공지", text: "Zoom 링크 / 일정 / 질문 양식 / 자료 안내 / 운영 규칙" }].map((item) => <div className="copy-box" key={item.label}><span>{item.label}</span><p>{item.text}</p><button onClick={() => copy(item.text)}>복사</button></div>)}<div className="rule-list"><h3>운영 원칙</h3><p>응답 가능 시간과 예상 시간을 미리 공지</p><p>민감정보는 공개방에 남기지 않기</p><p>비방·도배·저작권 침해는 기록 후 이관</p><p>종강 후 유지·자료 보관 기간 공지</p></div></aside></div>
-  </div>;
+function CoachGuide() { return <div className="page"><PageHeading eyebrow="COACH ROOM MANUAL" title="카카오 오픈채팅 코치방 개설 매뉴얼" description="제공된 2025년 10월 원본 매뉴얼 4페이지를 순서대로 그대로 확인하세요." action={<a className="primary-button" href="/manuals/coach-room-kakao-openchat-guide.pdf" download>원본 PDF 다운로드</a>} /><div className="manual-source-note"><strong>개설 순서</strong><span>대화 아이콘 → 오픈채팅 만들기 → 그룹채팅 → 커버·방명·설명·주제 → 기본프로필 → 참여 코드</span></div><div className="coach-manual-pages">{[1, 2, 3, 4].map((page) => <figure key={page}><img src={`/manuals/coach-room-page-${page}.png`} alt={`코치방 개설 방법 매뉴얼 ${page}페이지`} /><figcaption>{page} / 4</figcaption></figure>)}</div></div>; }
+
+function CrisisCenter({ workspace, setWorkspace, apiPatch, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (p: Record<string, unknown>) => Promise<Record<string, unknown>>; notify: (m: string) => void }) {
+  const [severity, setSeverity] = useState(2); const [form, setForm] = useState({ courseName: "", category: "강의 품질", detail: "", immediateAction: "", evidenceUrl: "" });
+  const submit = async () => { try { const result = await apiPatch({ action: "reportIssue", severity, ...form }); const issue: Issue = { id: String(result.id), severity, category: form.category, course_name: form.courseName, detail: form.detail, immediate_action: form.immediateAction, evidence_url: form.evidenceUrl || null, status: "reported", admin_action: null, admin_reply: null, created_at: new Date().toISOString(), updated_at: null }; setWorkspace((w) => ({ ...w, issues: [issue, ...w.issues] })); setForm({ courseName: "", category: "강의 품질", detail: "", immediateAction: "", evidenceUrl: "" }); notify("이슈를 관리자에게 접수했습니다."); } catch (e) { notify(e instanceof Error ? e.message : "신고하지 못했습니다."); } };
+  return <div className="page"><PageHeading eyebrow="CRISIS RESPONSE" title="사실을 기록하고, 관리자 조치를 확인하세요" description="입력한 이슈는 해당 강사별 관리자 화면에 전달되며 조치와 답변이 이곳에 표시됩니다." /><section className="severity-grid">{[{ level: 1, title: "일반 문의·불만", examples: "자료 누락 · 링크 오류 · 일정 문의" }, { level: 2, title: "민원 가능성", examples: "품질 · 환불 · 공개 채팅 항의" }, { level: 3, title: "긴급 이슈", examples: "협박 · 성희롱 · 개인정보 · 법적 언급" }].map((item) => <button className={`severity-card level-${item.level} ${severity === item.level ? "selected" : ""}`} key={item.level} onClick={() => setSeverity(item.level)}><span>{item.level}단계</span><h2>{item.title}</h2><p>{item.examples}</p></button>)}</section><div className="crisis-layout"><section className="panel issue-form"><div className="panel-head"><h2>{severity}단계 이슈 신고</h2></div><div className="two-fields"><label><span>강의명</span><input value={form.courseName} onChange={(e) => setForm({ ...form, courseName: e.target.value })} /></label><label><span>상황 분류</span><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option>강의 품질</option><option>환불·보상</option><option>개인정보</option><option>폭언·협박</option><option>기술 문제</option><option>기타</option></select></label></div><label><span>상세 상황</span><textarea rows={5} value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} placeholder="발생 시간과 상황을 사실 중심으로 10자 이상 적어 주세요." /></label><label><span>즉시 조치 내용</span><input value={form.immediateAction} onChange={(e) => setForm({ ...form, immediateAction: e.target.value })} /></label><label><span>증빙 링크</span><input value={form.evidenceUrl} onChange={(e) => setForm({ ...form, evidenceUrl: e.target.value })} /></label><button className="primary-button full" onClick={() => void submit()}>관리자에게 신고하기</button></section><aside className="issue-history"><h2>접수 및 조치 내역</h2>{workspace.issues.length ? workspace.issues.map((issue) => <article key={issue.id}><header><span>{issue.severity}단계 · {issue.category}</span><b>{issue.status === "resolved" ? "조치 완료" : issue.status === "reviewing" ? "검토 중" : "접수"}</b></header><h3>{issue.course_name}</h3><p>{issue.detail}</p>{issue.admin_action && <div><strong>관리자 조치</strong><p>{issue.admin_action}</p>{issue.admin_reply && <p>{issue.admin_reply}</p>}</div>}</article>) : <div className="inline-empty">접수한 이슈가 없습니다.</div>}</aside></div></div>;
 }
 
-function CrisisCenter({ workspace, setWorkspace, apiPatch, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (payload: Record<string, unknown>) => Promise<unknown>; notify: (message: string) => void }) {
-  const [severity, setSeverity] = useState(2);
-  const [form, setForm] = useState({ courseName: "", category: "강의 품질", detail: "", immediateAction: "", evidenceUrl: "" });
-  const submit = async () => { try { const result = await apiPatch({ action: "reportIssue", severity, ...form }) as { id?: string }; if (result.id) setWorkspace((current) => ({ ...current, issues: [{ id: result.id!, severity, category: form.category, course_name: form.courseName, status: "reported", created_at: new Date().toISOString() }, ...current.issues] })); setForm({ courseName: "", category: "강의 품질", detail: "", immediateAction: "", evidenceUrl: "" }); notify(severity === 3 ? "최고관리자에게 긴급 이슈를 전달했어요." : "이슈를 안전하게 접수했어요."); } catch (error) { notify(error instanceof Error ? error.message : "신고하지 못했습니다."); } };
-  const scripts = ["불편을 드려 죄송합니다. 말씀 주신 내용을 정확히 확인한 뒤 안내드리겠습니다. 확인을 위해 운영팀에도 전달하겠습니다.", "이 사안은 공개 채팅에서 상세히 다루기보다 정확한 확인 후 개별 안내드리겠습니다. 운영팀과 함께 확인해보겠습니다.", "환불 및 보상 관련 사항은 회사의 공식 기준에 따라 운영팀이 안내드리고 있습니다. 요청 내용을 전달해 확인 후 답변드리겠습니다."];
-  return <div className="page"><PageHeading eyebrow="CRISIS RESPONSE" title="혼자 판단하지 말고, 단계에 맞게 이관하세요" description="사실과 증빙을 먼저 기록하고 환불·법적 약속은 반드시 운영진에게 넘겨 주세요." action={<span className="urgent-pill"><i /> 긴급 시 즉시 관리자 연락</span>} />
-    <div className="crisis-principles">{["감정적으로 반박하지 않기", "사실·시간·대화 먼저 기록", "금전·법적 약속하지 않기", "개인정보 공개하지 않기", "심각도에 따라 즉시 이관"].map((item, index) => <div key={item}><span>{index + 1}</span><strong>{item}</strong></div>)}</div>
-    <section className="severity-grid">{[{ level: 1, title: "일반 문의·불만", examples: "자료 누락 · 링크 오류 · 일정 문의", action: "사실 확인 후 표준 안내", route: "24시간 내 미해결 시 관리자" }, { level: 2, title: "민원 가능성", examples: "품질 · 환불 · 공개 채팅 항의", action: "공개 논쟁 중단, 증빙 저장", route: "즉시 담당 관리자" }, { level: 3, title: "긴급 이슈", examples: "협박 · 성희롱 · 개인정보 · 법적 언급", action: "답변 최소화, 증빙 보존", route: "즉시 최고관리자" }].map((item) => <button className={`severity-card level-${item.level} ${severity === item.level ? "selected" : ""}`} key={item.level} onClick={() => setSeverity(item.level)}><span>{item.level}단계</span><h2>{item.title}</h2><p>{item.examples}</p><dl><div><dt>즉시 행동</dt><dd>{item.action}</dd></div><div><dt>이관</dt><dd>{item.route}</dd></div></dl></button>)}</section>
-    <div className="crisis-layout"><section className="panel issue-form"><div className="panel-head"><div><span className="section-index">REPORT</span><h2>{severity}단계 이슈 신고</h2></div><span className={`severity-dot level-${severity}`}>{severity}</span></div><div className="two-fields"><label><span>강의명</span><input value={form.courseName} onChange={(e) => setForm({ ...form, courseName: e.target.value })} placeholder="강의명을 입력하세요" /></label><label><span>상황 분류</span><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option>강의 품질</option><option>환불·보상</option><option>개인정보</option><option>폭언·협박</option><option>기술 문제</option><option>기타</option></select></label></div><label><span>상세 상황 <b>최소 10자</b></span><textarea rows={5} value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} placeholder="발생 시간, 수강생의 표현, 상황의 흐름을 사실 중심으로 적어 주세요." /></label><label><span>즉시 조치 내용</span><input value={form.immediateAction} onChange={(e) => setForm({ ...form, immediateAction: e.target.value })} placeholder="현재까지 취한 조치를 적어 주세요." /></label><label><span>증빙 링크 <em>선택</em></span><input value={form.evidenceUrl} onChange={(e) => setForm({ ...form, evidenceUrl: e.target.value })} placeholder="안전한 저장소의 캡처·대화 링크" /></label><button className={`primary-button full ${severity === 3 ? "danger" : ""}`} onClick={submit}>{severity === 3 ? "긴급 이슈 즉시 이관" : "관리자에게 신고하기"}</button></section>
-      <aside className="response-scripts"><h2>표준 응대 문구</h2>{scripts.map((script, index) => <div key={script}><span>{["일반 불만 접수", "공개 논쟁 차단", "환불·보상 요구"][index]}</span><p>{script}</p><button onClick={async () => { try { await navigator.clipboard.writeText(script); notify("응대 문구를 복사했어요."); } catch { notify("문구를 선택해 복사해 주세요."); } }}>복사</button></div>)}</aside></div>
-  </div>;
+function Library({ resources }: { resources: DeliveredResource[] }) {
+  const [query, setQuery] = useState(""); const items = resources.filter((r) => r.placement === "library"); const filtered = useMemo(() => items.filter((r) => `${r.resource_type} ${r.title} ${r.request_note}`.includes(query)), [items, query]);
+  return <div className="page"><PageHeading eyebrow="RESOURCE LIBRARY" title="내게 전달된 자료를 확인하세요" description="관리자가 강사별로 등록한 파일, 링크, 안내만 표시됩니다." /><div className="library-toolbar"><label><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="자료명 또는 카테고리 검색" /></label></div><div className="resource-grid delivered-only">{filtered.map((r, i) => <article key={r.id}><div className={`file-cover cover-${i % 4}`}><span>{r.resource_type}</span><strong>{r.title}</strong><b>{r.delivery_type === "file" ? "F" : r.delivery_type === "link" ? "↗" : "T"}</b></div><span className="resource-type">{r.resource_type}</span><h2>{r.title}</h2><p>{r.request_note || "관리자가 전달한 자료입니다."}</p>{r.delivery_type !== "text" && <a className="resource-download" href={`/api/resources/${r.id}`} target="_blank">{r.delivery_type === "file" ? "다운로드 ↓" : "링크 열기 ↗"}</a>}</article>)}{!filtered.length && <div className="library-empty"><strong>전달된 자료가 없습니다.</strong><span>관리자가 자료실에 등록하면 이곳에 강사별로 표시됩니다.</span></div>}</div></div>;
 }
 
-function Library({ resources: deliveredResources, notify }: { resources: DeliveredResource[]; notify: (message: string) => void }) {
-  const resources = [{ type: "기획안", title: "무료강의 기획안 기본 양식", meta: "DOCX · 2026.07.18 업데이트" }, { type: "운영", title: "강의 전·중·후 체크리스트", meta: "PDF · 2026.07.20 업데이트" }, { type: "Zoom", title: "Zoom 리허설 확인표", meta: "PDF · 2026.07.12 업데이트" }, { type: "코치방", title: "코치방 고정 공지 템플릿", meta: "DOCX · 2026.07.16 업데이트" }, { type: "위기대응", title: "민원·위기 이슈 신고 양식", meta: "DOCX · 2026.07.21 업데이트" }, { type: "브랜드", title: "어비 강의 자료 디자인 가이드", meta: "PDF · 2026.06.30 업데이트" }];
-  const [query, setQuery] = useState("");
-  const filtered = useMemo(() => resources.filter((resource) => `${resource.type} ${resource.title}`.includes(query)), [query]);
-  return <div className="page"><PageHeading eyebrow="RESOURCE LIBRARY" title="필요한 양식과 자료를 바로 찾으세요" description="강의 준비와 운영에 사용하는 최신 공식 자료만 모았습니다." />
-    {deliveredResources.length > 0 && <section className="delivered-resources"><div className="delivered-head"><div><span>FOR YOU</span><h2>관리자가 전달한 요청 자료</h2></div><strong>{deliveredResources.length}건</strong></div><div>{deliveredResources.map((resource) => <article key={resource.id}><span className={`delivery-icon ${resource.delivery_type}`}>{resource.delivery_type === "file" ? "F" : "↗"}</span><div><em>{resource.resource_type}</em><h3>{resource.title}</h3><p>{resource.request_note || (resource.delivery_type === "file" ? resource.file_name : "외부 링크로 전달된 자료입니다.")}</p></div><a href={`/api/resources/${resource.id}`} target="_blank" rel="noreferrer">{resource.delivery_type === "file" ? "다운로드" : "링크 열기"} <span>→</span></a></article>)}</div></section>}
-    <div className="library-toolbar"><label><span aria-hidden="true">⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="자료명 또는 카테고리 검색" /></label><div>{["전체", "기획안", "운영", "Zoom", "코치방", "위기대응"].map((item) => <button key={item} onClick={() => setQuery(item === "전체" ? "" : item)}>{item}</button>)}</div></div>
-    <div className="resource-grid">{filtered.map((resource, index) => <article key={resource.title}><div className={`file-cover cover-${index % 4}`}><span>{resource.type}</span><strong>{resource.title.split(" ").slice(0, 2).join(" ")}</strong><b>{resource.meta.startsWith("DOCX") ? "D" : "P"}</b></div><span className="resource-type">{resource.type}</span><h2>{resource.title}</h2><p>{resource.meta}</p><button onClick={() => notify(`${resource.title} 다운로드를 준비했어요.`)}>다운로드 <span>↓</span></button></article>)}</div>
-  </div>;
-}
-
-function Support({ notify }: { notify: (message: string) => void }) {
-  return <div className="page"><PageHeading eyebrow="HELP DESK" title="어떤 도움이 필요하신가요?" description="일반 문의는 담당 관리자에게, 긴급한 수강생 이슈는 위기대응 센터로 접수해 주세요." />
-    <div className="support-grid"><section className="panel"><span className="section-index">MY MANAGER</span><h2>이수민 매니저</h2><p>기획안 검토, 리허설 일정, 강의 준비 상태를 함께 확인합니다.</p><a className="primary-button" href="mailto:support@ubii.co.kr">이메일 보내기</a><small>평일 10:00–18:00 · 평균 3시간 내 답변</small></section><section className="panel"><span className="section-index">QUICK REQUEST</span><h2>지원 요청 남기기</h2><label><span>문의 유형</span><select><option>기획안·검토</option><option>강의 일정</option><option>Zoom·기술</option><option>계약·정산</option></select></label><label><span>문의 내용</span><textarea rows={4} placeholder="필요한 도움을 구체적으로 적어 주세요." /></label><button className="primary-button" onClick={() => notify("지원 요청을 접수했어요.")}>요청 보내기</button></section></div>
-  </div>;
+function Support({ workspace, setWorkspace, apiPatch, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (p: Record<string, unknown>) => Promise<Record<string, unknown>>; notify: (m: string) => void }) {
+  const [form, setForm] = useState({ requestType: "기획안·검토", message: "" });
+  const submit = async () => { try { const result = await apiPatch({ action: "createSupportRequest", ...form }); const item: SupportRequest = { id: String(result.id), request_type: form.requestType, message: form.message, admin_reply: null, status: "open", created_at: new Date().toISOString(), replied_at: null }; setWorkspace((w) => ({ ...w, supportRequests: [item, ...w.supportRequests] })); setForm({ ...form, message: "" }); notify("문의가 관리자에게 전달되었습니다."); } catch (e) { notify(e instanceof Error ? e.message : "요청하지 못했습니다."); } };
+  return <div className="page"><PageHeading eyebrow="HELP DESK" title="매니저에게 문의하세요" description="요청을 보내면 관리자 페이지에 강사별로 표시되고, 답변도 이 화면에서 확인할 수 있습니다." /><div className="support-grid"><section className="panel manager-only"><span className="section-index">MANAGER</span><h2>매니저</h2><p>기획안 검토, 일정, Zoom, 계약·정산 등 필요한 지원을 요청으로 남겨 주세요.</p><small>답변은 아래 문의 내역에 표시됩니다.</small></section><section className="panel"><span className="section-index">QUICK REQUEST</span><h2>지원 요청 남기기</h2><label><span>문의 유형</span><select value={form.requestType} onChange={(e) => setForm({ ...form, requestType: e.target.value })}><option>기획안·검토</option><option>강의 일정</option><option>Zoom·기술</option><option>계약·정산</option><option>기타</option></select></label><label><span>문의 내용</span><textarea rows={4} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="필요한 도움을 구체적으로 적어 주세요." /></label><button className="primary-button" onClick={() => void submit()}>요청 보내기</button></section></div><section className="support-history"><div className="section-title"><span className="section-index">HISTORY</span><h2>문의와 답변</h2></div>{workspace.supportRequests.map((item) => <article key={item.id}><header><span>{item.request_type}</span><time>{formatDate(item.created_at)}</time></header><p>{item.message}</p>{item.admin_reply ? <div><strong>매니저 답변</strong><p>{item.admin_reply}</p></div> : <small>답변 대기 중</small>}</article>)}{!workspace.supportRequests.length && <div className="inline-empty">아직 문의 내역이 없습니다.</div>}</section></div>;
 }

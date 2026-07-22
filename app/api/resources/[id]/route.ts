@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 type ResourceRow = {
   id: string;
   target_email: string;
-  delivery_type: "link" | "file";
+  delivery_type: "text" | "link" | "file";
   external_url: string | null;
   object_key: string | null;
   file_name: string | null;
@@ -36,6 +36,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         return Response.json({ error: "안전하지 않은 링크입니다." }, { status: 400 });
       }
       return Response.redirect(target.toString(), 302);
+    }
+
+    if (resource.delivery_type === "text") {
+      return Response.json({ error: "이 항목은 화면에서 확인하는 안내입니다." }, { status: 400 });
     }
 
     if (!resource.object_key) return Response.json({ error: "연결된 파일이 없습니다." }, { status: 404 });
