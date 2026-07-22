@@ -125,10 +125,12 @@ export async function POST(request: Request) {
         if (usernameOwner && usernameOwner.user_email !== email) return Response.json({ error: "이미 사용 중인 강사 아이디입니다." }, { status: 409 });
         const passwordCredential = await hashInstructorPassword(password);
 
-        const existing = await db.prepare(`SELECT u.email, u.role, p.registered_by_admin FROM users u
-          LEFT JOIN instructor_profiles p ON p.user_email = u.email WHERE u.email = ?`).bind(email).first<{ email: string; role: string; registered_by_admin: number | null }>();
+        const existing = await db.prepare(`SELECT u.email, u.role, p.registered_by_admin, c.username FROM users u
+          LEFT JOIN instructor_profiles p ON p.user_email = u.email
+          LEFT JOIN instructor_credentials c ON c.user_email = u.email
+          WHERE u.email = ?`).bind(email).first<{ email: string; role: string; registered_by_admin: number | null; username: string | null }>();
         if (existing) {
-          if (existing.role !== "instructor" || Number(existing.registered_by_admin) === 1) return Response.json({ error: "이미 등록된 이메일입니다." }, { status: 409 });
+          if (existing.role !== "instructor" || (Number(existing.registered_by_admin) === 1 && existing.username)) return Response.json({ error: "이미 로그인 계정이 등록된 이메일입니다." }, { status: 409 });
           await db.batch([
             db.prepare("UPDATE users SET display_name = ? WHERE email = ?").bind(displayName, email),
             db.prepare(`UPDATE instructor_profiles SET grade = ?, settlement_rate = ?, specialty = ?, manager_name = ?, manager_email = ?, registered_by_admin = 1 WHERE user_email = ?`)
