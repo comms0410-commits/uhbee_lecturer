@@ -6,18 +6,20 @@ import { siteDisplayName } from "./display-name";
 type TaskStatus = "not_started" | "in_progress" | "review" | "revision" | "done";
 type Section = "home" | "roadmap" | "planner" | "operations" | "zoom" | "coach" | "crisis" | "library" | "support";
 type Task = { id: string; stage: number; title: string; category: string; status: TaskStatus; due_date: string | null; sort_order: number };
-type DeliveredResource = { id: string; title: string; resource_type: string; request_note: string; delivery_type: "text" | "link" | "file"; placement: "roadmap" | "library"; stage: number | null; external_url: string | null; file_name: string | null; mime_type: string | null; size_bytes: number | null; created_at: string };
+type DeliveredResource = { id: string; title: string; resource_type: string; request_note: string; delivery_type: "text" | "link" | "file"; placement: "roadmap" | "library" | "contract"; stage: number | null; external_url: string | null; file_name: string | null; mime_type: string | null; size_bytes: number | null; created_at: string };
+type ResourceMessage = { id: string; resource_id: string; author_role: "instructor" | "admin"; body: string; created_at: string };
 type ProgressUpdate = { id: string; task_id: string; progress_note: string; question: string; admin_reply: string | null; created_at: string; replied_at: string | null };
 type CourseRun = { id: string; course_title: string; free_lecture_date: string; curriculum_date: string; created_at: string };
 type Issue = { id: string; severity: number; category: string; course_name: string; detail: string; immediate_action: string; evidence_url: string | null; status: string; admin_action: string | null; admin_reply: string | null; created_at: string; updated_at: string | null };
 type SupportRequest = { id: string; request_type: string; message: string; admin_reply: string | null; status: string; created_at: string; replied_at: string | null };
 type Workspace = {
   user: { email: string; displayName: string; role: "instructor" | "admin" | "superadmin" };
-  profile: { grade: string; contract_status: string; settlement_rate: number; specialty: string; manager_name: string };
+  profile: { grade: string; contract_status: string; settlement_rate: number; specialty: string; profile_bio: string; manager_name: string };
   tasks: Task[];
   plan: { content: Record<string, string>; status: string; version: number; reviewerComment: string | null; reviewChecklist: Record<string, boolean>; updatedAt: string | null };
   issues: Issue[];
   resources: DeliveredResource[];
+  resourceMessages: ResourceMessage[];
   progressUpdates: ProgressUpdate[];
   courseRuns: CourseRun[];
   supportRequests: SupportRequest[];
@@ -40,9 +42,9 @@ const defaultTasks: Task[] = [
 
 const emptyWorkspace = (name: string, email: string): Workspace => ({
   user: { email, displayName: name, role: "instructor" },
-  profile: { grade: "연습강사", contract_status: "계약 완료", settlement_rate: 50, specialty: "전문 분야 등록 전", manager_name: "매니저" },
+  profile: { grade: "연습강사", contract_status: "계약 완료", settlement_rate: 50, specialty: "전문 분야 등록 전", profile_bio: "", manager_name: "매니저" },
   tasks: defaultTasks, plan: { content: {}, status: "draft", version: 1, reviewerComment: null, reviewChecklist: {}, updatedAt: null },
-  issues: [], resources: [], progressUpdates: [], courseRuns: [], supportRequests: [],
+  issues: [], resources: [], resourceMessages: [], progressUpdates: [], courseRuns: [], supportRequests: [],
 });
 
 const statusMeta: Record<TaskStatus, { label: string; tone: string }> = {
@@ -87,15 +89,46 @@ function HomeDashboard({ workspace, progress, nextTask, onMove }: { workspace: W
 }
 
 function Roadmap({ workspace, setWorkspace, apiPatch, onSetStatus, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (p: Record<string, unknown>) => Promise<Record<string, unknown>>; onSetStatus: (t: Task, s: TaskStatus) => void; notify: (m: string) => void }) {
-  const [open, setOpen] = useState(""); const [drafts, setDrafts] = useState<Record<string, { progressNote: string; question: string }>>({});
-  const descriptions = ["프로필, 전문 분야, 계약·정산 정보를 확인합니다.", "채널 진단과 콘텐츠 개선 과제를 정리합니다.", "강의 스킬과 커리큘럼 구성 원칙을 익힙니다.", "기획안과 무료강의 자료를 완성하고 검토받습니다.", "OT와 Zoom 리허설을 통과해 운영을 검증합니다.", "코치방 운영 기록과 성공사례를 축적합니다.", "민원·위기 이슈의 1·2·3단계 대응을 익힙니다."];
-  const share = async (task: Task) => { const draft = drafts[task.id] ?? { progressNote: "", question: "" }; try { const result = await apiPatch({ action: "shareProgress", taskId: task.id, ...draft }); const update: ProgressUpdate = { id: String(result.id), task_id: task.id, progress_note: draft.progressNote, question: draft.question, admin_reply: null, created_at: new Date().toISOString(), replied_at: null }; setWorkspace((w) => ({ ...w, tasks: w.tasks.map((t) => t.id === task.id ? { ...t, status: "review" } : t), progressUpdates: [update, ...w.progressUpdates] })); setDrafts((d) => ({ ...d, [task.id]: { progressNote: "", question: "" } })); notify("진행 내용을 관리자에게 공유했습니다."); } catch (e) { notify(e instanceof Error ? e.message : "공유하지 못했습니다."); } };
-  return <div className="page"><PageHeading eyebrow="GROWTH ROADMAP" title="전문강사까지, 7단계로 준비합니다" description="관리자가 단계별로 전달한 확인 내용과 자료를 보고, 진행 과정과 질문을 공유하세요." /><div className="roadmap-summary"><div><strong>{workspace.tasks.filter((t) => t.status === "done").length}<span>/7</span></strong><p>완료한 단계</p></div><div className="roadmap-line"><i style={{ width: `${workspace.tasks.filter((t) => t.status === "done").length / 7 * 100}%` }} /></div><span>진행 공유는 관리자 답변과 함께 보관됩니다.</span></div>
-    <div className="roadmap-list">{workspace.tasks.map((task) => { const stageResources = workspace.resources.filter((r) => r.placement === "roadmap" && Number(r.stage) === task.stage); const updates = workspace.progressUpdates.filter((u) => u.task_id === task.id); const mode = open.startsWith(`${task.id}:`) ? open.split(":")[1] : ""; const draft = drafts[task.id] ?? { progressNote: "", question: "" }; return <article className={`roadmap-card ${task.status}`} key={task.id}><div className="roadmap-number">{String(task.stage).padStart(2, "0")}</div><div className="roadmap-body"><div className="roadmap-title"><div><span>{task.category}</span><h2>{task.title}</h2></div><StatusBadge status={task.status} /></div><p>{descriptions[task.stage - 1]}</p><div className="roadmap-actions"><button className="secondary-button" onClick={() => setOpen(mode === "confirm" ? "" : `${task.id}:confirm`)}>확인하기</button><button className="secondary-button" onClick={() => setOpen(mode === "files" ? "" : `${task.id}:files`)}>자료 다운로드</button><button className="secondary-button" onClick={() => setOpen(mode === "share" ? "" : `${task.id}:share`)}>진행 공유</button><button className="wait-button" onClick={() => onSetStatus(task, "not_started")}>진행 대기</button><button className={`complete-button ${task.status === "done" ? "done" : ""}`} onClick={() => onSetStatus(task, "done")}>{task.status === "done" ? "✓ 완료됨" : "완료 체크"}</button></div>
-      {mode === "confirm" && <div className="roadmap-detail"><h3>매니저가 확인 요청한 내용</h3>{stageResources.length ? stageResources.map((r) => <article key={r.id}><strong>{r.title}</strong><p>{r.request_note || "첨부 자료를 확인해 주세요."}</p>{r.delivery_type === "link" && <a href={`/api/resources/${r.id}`} target="_blank">관련 링크 열기 →</a>}</article>) : <div className="inline-empty">아직 등록된 확인 내용이 없습니다.</div>}</div>}
-      {mode === "files" && <div className="roadmap-detail"><h3>단계별 자료</h3>{stageResources.filter((r) => r.delivery_type !== "text").length ? stageResources.filter((r) => r.delivery_type !== "text").map((r) => <article key={r.id}><div><strong>{r.title}</strong><p>{r.request_note}</p></div><a href={`/api/resources/${r.id}`} target="_blank">{r.delivery_type === "file" ? "다운로드 ↓" : "링크 열기 ↗"}</a></article>) : <div className="inline-empty">아직 전달된 파일이나 링크가 없습니다.</div>}</div>}
-      {mode === "share" && <div className="roadmap-detail progress-share"><h3>진행 과정 공유</h3><label><span>어떻게 진행했나요?</span><textarea rows={3} value={draft.progressNote} onChange={(e) => setDrafts((d) => ({ ...d, [task.id]: { ...draft, progressNote: e.target.value } }))} placeholder="수행한 내용과 결과를 구체적으로 적어 주세요." /></label><label><span>문의 사항</span><textarea rows={2} value={draft.question} onChange={(e) => setDrafts((d) => ({ ...d, [task.id]: { ...draft, question: e.target.value } }))} placeholder="막힌 부분이나 확인이 필요한 내용을 적어 주세요." /></label><button className="primary-button" onClick={() => void share(task)}>관리자에게 공유하기</button>{updates.map((u) => <article className="progress-thread" key={u.id}><span>{formatDate(u.created_at)} 공유</span><p>{u.progress_note}</p>{u.question && <p><b>문의</b> {u.question}</p>}{u.admin_reply && <div><strong>매니저 답변</strong><p>{u.admin_reply}</p></div>}</article>)}</div>}
-      <footer><span>완료 기준</span><strong>{task.stage === 4 ? "관리자 검토 승인" : task.stage === 5 ? "리허설 통과" : "필수 내용 확인 및 진행 공유"}</strong></footer></div></article>; })}</div></div>;
+  const [open, setOpen] = useState("");
+  const [messageDrafts, setMessageDrafts] = useState<Record<string, string>>({});
+  const [profileDraft, setProfileDraft] = useState({ displayName: workspace.user.displayName, specialty: workspace.profile.specialty, profileBio: workspace.profile.profile_bio });
+  const descriptions = ["강사 프로필과 전문 분야를 등록하고 체결 계약서를 확인합니다.", "채널 진단과 콘텐츠 개선 과제를 정리합니다.", "강의 스킬과 커리큘럼 구성 원칙을 익힙니다.", "기획안과 무료강의 자료를 완성하고 검토받습니다.", "OT와 Zoom 리허설을 통과해 운영을 검증합니다.", "코치방 운영 기록과 성공사례를 축적합니다.", "민원·위기 이슈의 1·2·3단계 대응을 익힙니다."];
+  useEffect(() => { setProfileDraft({ displayName: workspace.user.displayName, specialty: workspace.profile.specialty, profileBio: workspace.profile.profile_bio ?? "" }); }, [workspace.user.displayName, workspace.profile.specialty, workspace.profile.profile_bio]);
+
+  const saveProfile = async () => {
+    try {
+      await apiPatch({ action: "updateProfile", ...profileDraft });
+      setWorkspace((current) => ({ ...current, user: { ...current.user, displayName: profileDraft.displayName }, profile: { ...current.profile, specialty: profileDraft.specialty, profile_bio: profileDraft.profileBio } }));
+      notify("강사 프로필을 등록했습니다.");
+    } catch (error) { notify(error instanceof Error ? error.message : "프로필을 저장하지 못했습니다."); }
+  };
+
+  const replyResource = async (resource: DeliveredResource) => {
+    const message = (messageDrafts[resource.id] ?? "").trim();
+    try {
+      const result = await apiPatch({ action: "replyResource", resourceId: resource.id, message });
+      const created: ResourceMessage = { id: String(result.id), resource_id: resource.id, author_role: "instructor", body: message, created_at: String(result.createdAt ?? new Date().toISOString()) };
+      setWorkspace((current) => ({ ...current, resourceMessages: [...current.resourceMessages, created] }));
+      setMessageDrafts((current) => ({ ...current, [resource.id]: "" }));
+      notify("답변을 관리자에게 전달했습니다.");
+    } catch (error) { notify(error instanceof Error ? error.message : "답변을 보내지 못했습니다."); }
+  };
+
+  return <div className="page"><PageHeading eyebrow="GROWTH ROADMAP" title="전문강사까지, 7단계로 준비합니다" description="관리자가 단계별로 전달한 안내를 확인하고 필요한 답변을 남기거나 자료를 내려받으세요." /><div className="roadmap-summary"><div><strong>{workspace.tasks.filter((task) => task.status === "done").length}<span>/7</span></strong><p>완료한 단계</p></div><div className="roadmap-line"><i style={{ width: `${workspace.tasks.filter((task) => task.status === "done").length / 7 * 100}%` }} /></div><span>단계별 안내와 답변은 관리자 화면과 연결됩니다.</span></div>
+    <div className="roadmap-list">{workspace.tasks.map((task) => {
+      const stageResources = workspace.resources.filter((resource) => resource.placement === "roadmap" && Number(resource.stage) === task.stage);
+      const confirmationResources = stageResources.filter((resource) => resource.delivery_type === "text" || resource.delivery_type === "link");
+      const fileResources = stageResources.filter((resource) => resource.delivery_type === "file");
+      const contracts = workspace.resources.filter((resource) => resource.placement === "contract" && resource.delivery_type === "file");
+      const mode = open.startsWith(`${task.id}:`) ? open.split(":")[1] : "";
+      return <article className={`roadmap-card ${task.status}`} key={task.id}><div className="roadmap-number">{String(task.stage).padStart(2, "0")}</div><div className="roadmap-body"><div className="roadmap-title"><div><span>{task.category}</span><h2>{task.title}</h2></div><StatusBadge status={task.status} /></div><p>{descriptions[task.stage - 1]}</p>
+        <div className="roadmap-actions">{task.stage === 1 ? <><button className="secondary-button" onClick={() => setOpen(mode === "profile" ? "" : `${task.id}:profile`)}>등록하기</button><button className="secondary-button" onClick={() => setOpen(mode === "contract" ? "" : `${task.id}:contract`)}>계약서 확인하기</button></> : <><button className="secondary-button" onClick={() => setOpen(mode === "confirm" ? "" : `${task.id}:confirm`)}>확인하기</button><button className="secondary-button" onClick={() => setOpen(mode === "files" ? "" : `${task.id}:files`)}>자료 다운로드</button></>}<button className="wait-button" onClick={() => onSetStatus(task, "not_started")}>진행 대기</button><button className={`complete-button ${task.status === "done" ? "done" : ""}`} onClick={() => onSetStatus(task, "done")}>{task.status === "done" ? "✓ 완료됨" : "완료 체크"}</button></div>
+        {mode === "profile" && <div className="roadmap-detail profile-register"><h3>강사 프로필 등록</h3><label><span>강사명</span><input value={profileDraft.displayName} onChange={(event) => setProfileDraft({ ...profileDraft, displayName: event.target.value })} /></label><label><span>전문 분야</span><input value={profileDraft.specialty} onChange={(event) => setProfileDraft({ ...profileDraft, specialty: event.target.value })} placeholder="예: AI 업무자동화" /></label><label><span>프로필 소개</span><textarea rows={4} value={profileDraft.profileBio} onChange={(event) => setProfileDraft({ ...profileDraft, profileBio: event.target.value })} placeholder="강의 경험, 주요 경력과 전문성을 소개해 주세요." /></label><button className="primary-button" onClick={() => void saveProfile()}>프로필 저장</button></div>}
+        {mode === "contract" && <div className="roadmap-detail"><h3>체결 계약서</h3>{contracts.length ? contracts.map((resource) => <article key={resource.id}><div><strong>{resource.title}</strong><p>{resource.file_name || resource.request_note}</p></div><a href={`/api/resources/${resource.id}`} target="_blank">계약서 열기 ↓</a></article>) : <div className="inline-empty">관리자가 등록한 계약서가 아직 없습니다.</div>}</div>}
+        {mode === "confirm" && <div className="roadmap-detail resource-conversations"><h3>관리자가 전달한 확인 내용</h3>{confirmationResources.length ? confirmationResources.map((resource) => { const messages = workspace.resourceMessages.filter((message) => message.resource_id === resource.id); return <article className="resource-conversation" key={resource.id}><div className="resource-conversation-head"><div><strong>{resource.title}</strong><p>{resource.request_note || "확인해 주세요."}</p></div>{resource.delivery_type === "link" && <a href={`/api/resources/${resource.id}`} target="_blank">관련 링크 열기 →</a>}</div>{messages.length > 0 && <div className="message-thread">{messages.map((message) => <div className={message.author_role} key={message.id}><span>{message.author_role === "admin" ? "관리자" : "나"} · {formatDate(message.created_at)}</span><p>{message.body}</p></div>)}</div>}<div className="resource-reply"><textarea rows={3} value={messageDrafts[resource.id] ?? ""} onChange={(event) => setMessageDrafts((current) => ({ ...current, [resource.id]: event.target.value }))} placeholder="확인한 내용이나 질문, 답변을 입력해 주세요." /><button className="primary-button" onClick={() => void replyResource(resource)}>답변 등록</button></div></article>; }) : <div className="inline-empty">아직 등록된 확인 내용이나 링크가 없습니다.</div>}</div>}
+        {mode === "files" && <div className="roadmap-detail"><h3>업로드된 자료 목록</h3>{fileResources.length ? fileResources.map((resource) => <article key={resource.id}><div><strong>{resource.title}</strong><p>{resource.file_name}{resource.request_note ? ` · ${resource.request_note}` : ""}</p></div><a href={`/api/resources/${resource.id}`} target="_blank">선택하여 다운로드 ↓</a></article>) : <div className="inline-empty">아직 업로드된 자료가 없습니다.</div>}</div>}
+        <footer><span>완료 기준</span><strong>{task.stage === 1 ? "프로필 등록 및 계약서 확인" : task.stage === 4 ? "관리자 검토 승인" : task.stage === 5 ? "리허설 통과" : "필수 내용과 자료 확인"}</strong></footer></div></article>;
+    })}</div></div>;
 }
 
 function Planner({ workspace, setWorkspace, apiPatch, notify }: { workspace: Workspace; setWorkspace: React.Dispatch<React.SetStateAction<Workspace>>; apiPatch: (p: Record<string, unknown>) => Promise<Record<string, unknown>>; notify: (m: string) => void }) {

@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     if ("error" in auth) return auth.error;
     const { db, user } = auth.session;
 
-    const [instructors, resources, tasks, progressUpdates, plans, issues, courseRuns, supportRequests] = await Promise.all([
+    const [instructors, resources, resourceMessages, tasks, progressUpdates, plans, issues, courseRuns, supportRequests] = await Promise.all([
       db.prepare(`SELECT
         u.email, u.display_name, u.role, u.created_at,
         p.grade, p.contract_status, p.settlement_rate, p.specialty, p.manager_name, c.username,
@@ -51,6 +51,12 @@ export async function GET(request: Request) {
         JOIN users u ON u.email = r.target_email
         JOIN instructor_profiles p ON p.user_email = u.email AND p.registered_by_admin = 1
         ORDER BY r.created_at DESC`).all(),
+      db.prepare(`SELECT m.*, u.display_name AS instructor_name
+        FROM resource_messages m
+        JOIN instructor_resources r ON r.id = m.resource_id
+        JOIN users u ON u.email = r.target_email
+        JOIN instructor_profiles p ON p.user_email = u.email AND p.registered_by_admin = 1
+        ORDER BY m.created_at ASC`).all(),
       db.prepare(`SELECT t.* FROM onboarding_tasks t
         JOIN instructor_profiles p ON p.user_email = t.user_email AND p.registered_by_admin = 1
         ORDER BY t.user_email, t.sort_order`).all(),
@@ -83,6 +89,7 @@ export async function GET(request: Request) {
       user: { email: user.email, displayName: user.display_name, role: user.role },
       instructors: instructors.results.map((item) => ({ ...item, display_name: siteDisplayName(String(item.display_name ?? "")) })),
       resources: resources.results.map((item) => ({ ...item, target_name: siteDisplayName(String(item.target_name ?? "")) })),
+      resourceMessages: resourceMessages.results,
       tasks: tasks.results,
       progressUpdates: progressUpdates.results,
       plans: plans.results,
@@ -161,6 +168,28 @@ export async function POST(request: Request) {
         return Response.json({ ok: true });
       }
 
+      if (action === "replyResource") {
+        const resourceId = String(body.resourceId ?? "").trim();
+        const reply = String(body.reply ?? "").trim();
+        const resource = await db.prepare("SELECT target_email FROM instructor_resources WHERE id = ? AND delivery_type IN ('text', 'link')")
+          .bind(resourceId).first<{ target_email: string }>();
+        if (!resource || !(await isRegisteredInstructor(db, resource.target_email)) || reply.length < 2 || reply.length > 5000) {
+          return Response.json({ error: "강사와 2~5,000자의 답변 내용을 확인해 주세요." }, { status: 400 });
+        }
+        const id = crypto.randomUUID();
+        await db.prepare("INSERT INTO resource_messages (id, resource_id, user_email, author_role, body) VALUES (?, ?, ?, 'admin', ?)")
+          .bind(id, resourceId, resource.target_email, reply).run();
+        return Response.json({ ok: true, id });
+      }
+
+      if (action === "deleteResourceMessage") {
+        const id = String(body.id ?? "").trim();
+        if (!id) return Response.json({ error: "삭제할 답변을 선택해 주세요." }, { status: 400 });
+        const deleted = await db.prepare("DELETE FROM resource_messages WHERE id = ?").bind(id).run();
+        if (!Number(deleted.meta?.changes ?? 0)) return Response.json({ error: "답변을 찾을 수 없습니다." }, { status: 404 });
+        return Response.json({ ok: true });
+      }
+
       if (action === "reviewPlan") {
         const targetEmail = String(body.targetEmail ?? "").trim().toLowerCase();
         const reviewerComment = String(body.reviewerComment ?? "").trim();
@@ -209,9 +238,10 @@ export async function POST(request: Request) {
     const externalUrl = textValue(form, "externalUrl");
     const fileValue = form.get("file");
 
-    if (!targetEmail || !title || !["text", "link", "file"].includes(deliveryType) || !["roadmap", "library"].includes(placement)) return Response.json({ error: "대상 강사, 자료명, 전달 위치와 방식을 확인해 주세요." }, { status: 400 });
+    if (!targetEmail || !title || !["text", "link", "file"].includes(deliveryType) || !["roadmap", "library", "contract"].includes(placement)) return Response.json({ error: "대상 강사, 자료명, 전달 위치와 방식을 확인해 주세요." }, { status: 400 });
     if (!(await isRegisteredInstructor(db, targetEmail))) return Response.json({ error: "등록된 강사를 선택해 주세요." }, { status: 400 });
     if (placement === "roadmap" && (!Number.isInteger(stage) || stage < 1 || stage > 7)) return Response.json({ error: "로드맵 단계를 선택해 주세요." }, { status: 400 });
+    if (placement === "contract" && deliveryType !== "file") return Response.json({ error: "계약서는 파일로 등록해 주세요." }, { status: 400 });
     if (deliveryType === "text" && requestNote.length < 2) return Response.json({ error: "강사가 확인할 내용을 입력해 주세요." }, { status: 400 });
     if (deliveryType === "link" && !validWebUrl(externalUrl)) return Response.json({ error: "http:// 또는 https://로 시작하는 올바른 링크를 입력해 주세요." }, { status: 400 });
     if (deliveryType === "file" && (!(fileValue instanceof File) || fileValue.size === 0)) return Response.json({ error: "전달할 파일을 선택해 주세요." }, { status: 400 });

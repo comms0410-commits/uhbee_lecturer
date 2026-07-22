@@ -20,6 +20,7 @@ export async function ensureCoreSchema() {
       contract_status TEXT NOT NULL DEFAULT '계약 완료',
       settlement_rate INTEGER NOT NULL DEFAULT 50,
       specialty TEXT NOT NULL DEFAULT '전문 분야 등록 전',
+      profile_bio TEXT NOT NULL DEFAULT '',
       manager_name TEXT NOT NULL DEFAULT '매니저',
       manager_email TEXT NOT NULL DEFAULT '',
       registered_by_admin INTEGER NOT NULL DEFAULT 0,
@@ -95,6 +96,16 @@ export async function ensureCoreSchema() {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_email) REFERENCES users(email)
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS resource_messages (
+      id TEXT PRIMARY KEY NOT NULL,
+      resource_id TEXT NOT NULL,
+      user_email TEXT NOT NULL,
+      author_role TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (resource_id) REFERENCES instructor_resources(id),
+      FOREIGN KEY (user_email) REFERENCES users(email)
+    )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS task_progress_updates (
       id TEXT PRIMARY KEY NOT NULL,
       user_email TEXT NOT NULL,
@@ -130,12 +141,14 @@ export async function ensureCoreSchema() {
     db.prepare("CREATE INDEX IF NOT EXISTS onboarding_tasks_user_idx ON onboarding_tasks (user_email, sort_order)"),
     db.prepare("CREATE INDEX IF NOT EXISTS student_issues_user_idx ON student_issues (user_email, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS instructor_resources_target_idx ON instructor_resources (target_email, created_at)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS resource_messages_resource_idx ON resource_messages (resource_id, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS task_progress_user_idx ON task_progress_updates (user_email, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS course_runs_user_idx ON course_runs (user_email, created_at)"),
     db.prepare("CREATE INDEX IF NOT EXISTS support_requests_user_idx ON support_requests (user_email, created_at)")
   ]);
   const columnMigrations = [
     "ALTER TABLE instructor_profiles ADD COLUMN registered_by_admin INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE instructor_profiles ADD COLUMN profile_bio TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE lesson_plans ADD COLUMN review_checklist TEXT NOT NULL DEFAULT '{}'",
     "ALTER TABLE student_issues ADD COLUMN admin_action TEXT",
     "ALTER TABLE student_issues ADD COLUMN admin_reply TEXT",

@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { hasAdminSession } from "../../admin-auth";
 import { ensureUser } from "../../session";
+import { ensureCoreSchema } from "@/db/runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ type ResourceRow = {
   id: string;
   target_email: string;
   delivery_type: "text" | "link" | "file";
+  placement: "roadmap" | "library" | "contract";
   external_url: string | null;
   object_key: string | null;
   file_name: string | null;
@@ -18,14 +20,16 @@ type ResourceRow = {
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await ensureUser(request);
-    if (!session) return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    const adminSession = await hasAdminSession(request);
+    if (!session && !adminSession) return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    const db = session?.db ?? await ensureCoreSchema();
     const { id } = await params;
-    const resource = await session.db.prepare(`SELECT id, target_email, delivery_type, external_url, object_key, file_name, mime_type, size_bytes
+    const resource = await db.prepare(`SELECT id, target_email, delivery_type, placement, external_url, object_key, file_name, mime_type, size_bytes
       FROM instructor_resources WHERE id = ?`).bind(id).first<ResourceRow>();
     if (!resource) return Response.json({ error: "자료를 찾을 수 없습니다." }, { status: 404 });
 
-    const canManage = session.user.role === "admin" || session.user.role === "superadmin" || await hasAdminSession(request);
-    if (!canManage && resource.target_email !== session.user.email) {
+    const canManage = adminSession || session?.user.role === "admin" || session?.user.role === "superadmin";
+    if (!canManage && resource.target_email !== session?.user.email) {
       return Response.json({ error: "이 자료에 접근할 권한이 없습니다." }, { status: 403 });
     }
 
@@ -50,7 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     object.writeHttpMetadata(headers);
     headers.set("content-type", resource.mime_type || headers.get("content-type") || "application/octet-stream");
     headers.set("content-length", String(resource.size_bytes ?? object.size));
-    headers.set("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(resource.file_name ?? "download")}`);
+    headers.set("content-disposition", `${resource.placement === "contract" ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(resource.file_name ?? "download")}`);
     headers.set("cache-control", "private, no-store");
     return new Response(object.body, { headers });
   } catch (error) {

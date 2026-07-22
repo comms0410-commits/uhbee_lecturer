@@ -14,6 +14,7 @@ export const instructorProfiles = sqliteTable("instructor_profiles", {
   contractStatus: text("contract_status").notNull().default("계약 완료"),
   settlementRate: integer("settlement_rate").notNull().default(50),
   specialty: text("specialty").notNull().default("전문 분야 등록 전"),
+  profileBio: text("profile_bio").notNull().default(""),
   managerName: text("manager_name").notNull().default("이수민 매니저"),
   managerEmail: text("manager_email").notNull().default("support@ubii.co.kr"),
   registeredByAdmin: integer("registered_by_admin", { mode: "boolean" }).notNull().default(false),
@@ -64,7 +65,7 @@ export const instructorResources = sqliteTable("instructor_resources", {
   resourceType: text("resource_type").notNull().default("전자책"),
   requestNote: text("request_note").notNull().default(""),
   deliveryType: text("delivery_type", { enum: ["text", "link", "file"] }).notNull(),
-  placement: text("placement", { enum: ["roadmap", "library"] }).notNull().default("library"),
+  placement: text("placement", { enum: ["roadmap", "library", "contract"] }).notNull().default("library"),
   stage: integer("stage"),
   externalUrl: text("external_url"),
   objectKey: text("object_key"),
@@ -74,6 +75,15 @@ export const instructorResources = sqliteTable("instructor_resources", {
   createdBy: text("created_by").notNull().references(() => users.email),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [index("instructor_resources_target_idx").on(table.targetEmail, table.createdAt)]);
+
+export const resourceMessages = sqliteTable("resource_messages", {
+  id: text("id").primaryKey(),
+  resourceId: text("resource_id").notNull().references(() => instructorResources.id),
+  userEmail: text("user_email").notNull().references(() => users.email),
+  authorRole: text("author_role", { enum: ["instructor", "admin"] }).notNull(),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [index("resource_messages_resource_idx").on(table.resourceId, table.createdAt)]);
 
 export const adminLoginAttempts = sqliteTable("admin_login_attempts", {
   id: text("id").primaryKey(),

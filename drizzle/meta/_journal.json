@@ -50,6 +50,13 @@
       "when": 1784688615136,
       "tag": "0006_brown_omega_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784693706768,
+      "tag": "0007_nosy_lady_vermin",
+      "breakpoints": true
     }
   ]
 }

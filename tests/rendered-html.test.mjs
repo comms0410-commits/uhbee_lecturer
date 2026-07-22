@@ -39,7 +39,12 @@ test("defines the complete UhB instructor center", async () => {
   assert.match(instructorAuth, /PBKDF2_ITERATIONS/);
   assert.match(instructorAuth, /PBKDF2_ITERATIONS = 100_000/);
   assert.match(app, /확인하기/);
-  assert.match(app, /진행 공유/);
+  assert.doesNotMatch(app, />진행 공유<\/button>/);
+  assert.match(app, /계약서 확인하기/);
+  assert.match(app, /프로필 저장/);
+  assert.match(app, /답변 등록/);
+  assert.match(admin, /계약서 등록/);
+  assert.match(admin, /deleteResourceMessage/);
   assert.match(app, /진행 대기/);
   assert.match(app, /관리자 검토 체크리스트/);
   assert.match(app, /원본 PDF 다운로드/);
@@ -67,6 +72,7 @@ test("ships persistence, migrations, and a branded social card", async () => {
   await access(new URL("../drizzle/0004_graceful_the_executioner.sql", import.meta.url));
   await access(new URL("../drizzle/0005_overjoyed_spot.sql", import.meta.url));
   await access(new URL("../drizzle/0006_brown_omega_sentinel.sql", import.meta.url));
+  await access(new URL("../drizzle/0007_nosy_lady_vermin.sql", import.meta.url));
   await access(new URL("../app/api/instructor/login/route.ts", import.meta.url));
   await access(new URL("../public/manuals/coach-room-kakao-openchat-guide.pdf", import.meta.url));
   await access(new URL("../public/manuals/coach-room-page-4.png", import.meta.url));

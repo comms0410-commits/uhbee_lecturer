@@ -12,12 +12,15 @@ export async function GET(request: Request) {
     if (!session) return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
     const { db, user } = session;
 
-    const [profile, tasks, plan, issues, resources, progressUpdates, courseRuns, supportRequests] = await Promise.all([
-      db.prepare("SELECT grade, contract_status, settlement_rate, specialty, manager_name FROM instructor_profiles WHERE user_email = ?").bind(user.email).first(),
+    const [profile, tasks, plan, issues, resources, resourceMessages, progressUpdates, courseRuns, supportRequests] = await Promise.all([
+      db.prepare("SELECT grade, contract_status, settlement_rate, specialty, profile_bio, manager_name FROM instructor_profiles WHERE user_email = ?").bind(user.email).first(),
       db.prepare("SELECT id, stage, title, category, status, due_date, sort_order FROM onboarding_tasks WHERE user_email = ? ORDER BY sort_order ASC").bind(user.email).all(),
       db.prepare("SELECT content, status, version, reviewer_comment, review_checklist, updated_at FROM lesson_plans WHERE user_email = ?").bind(user.email).first<{ content: string; status: string; version: number; reviewer_comment: string | null; review_checklist: string; updated_at: string }>(),
       db.prepare("SELECT id, severity, category, course_name, detail, immediate_action, evidence_url, status, admin_action, admin_reply, created_at, updated_at FROM student_issues WHERE user_email = ? ORDER BY created_at DESC LIMIT 20").bind(user.email).all(),
       db.prepare("SELECT id, title, resource_type, request_note, delivery_type, placement, stage, external_url, file_name, mime_type, size_bytes, created_at FROM instructor_resources WHERE target_email = ? ORDER BY created_at DESC").bind(user.email).all(),
+      db.prepare(`SELECT m.id, m.resource_id, m.author_role, m.body, m.created_at
+        FROM resource_messages m JOIN instructor_resources r ON r.id = m.resource_id
+        WHERE r.target_email = ? ORDER BY m.created_at ASC`).bind(user.email).all(),
       db.prepare("SELECT id, task_id, progress_note, question, admin_reply, created_at, replied_at FROM task_progress_updates WHERE user_email = ? ORDER BY created_at DESC").bind(user.email).all(),
       db.prepare("SELECT id, course_title, free_lecture_date, curriculum_date, created_at FROM course_runs WHERE user_email = ? ORDER BY free_lecture_date DESC, created_at DESC").bind(user.email).all(),
       db.prepare("SELECT id, request_type, message, admin_reply, status, created_at, replied_at FROM support_requests WHERE user_email = ? ORDER BY created_at DESC").bind(user.email).all(),
@@ -37,6 +40,7 @@ export async function GET(request: Request) {
       },
       issues: issues.results,
       resources: resources.results,
+      resourceMessages: resourceMessages.results,
       progressUpdates: progressUpdates.results,
       courseRuns: courseRuns.results,
       supportRequests: supportRequests.results,
@@ -62,6 +66,32 @@ export async function PATCH(request: Request) {
       }
       await db.prepare("UPDATE onboarding_tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_email = ?").bind(status, id, user.email).run();
       return Response.json({ ok: true });
+    }
+
+    if (action === "updateProfile") {
+      const displayName = String(body.displayName ?? "").trim();
+      const specialty = String(body.specialty ?? "").trim();
+      const profileBio = String(body.profileBio ?? "").trim();
+      if (displayName.length < 2 || specialty.length < 2 || profileBio.length < 10) {
+        return Response.json({ error: "강사명, 전문 분야와 10자 이상의 프로필 소개를 입력해 주세요." }, { status: 400 });
+      }
+      await db.batch([
+        db.prepare("UPDATE users SET display_name = ? WHERE email = ?").bind(displayName, user.email),
+        db.prepare("UPDATE instructor_profiles SET specialty = ?, profile_bio = ? WHERE user_email = ?").bind(specialty, profileBio, user.email),
+      ]);
+      return Response.json({ ok: true, displayName, specialty, profileBio });
+    }
+
+    if (action === "replyResource") {
+      const resourceId = String(body.resourceId ?? "").trim();
+      const message = String(body.message ?? "").trim();
+      const resource = await db.prepare("SELECT id FROM instructor_resources WHERE id = ? AND target_email = ? AND delivery_type IN ('text', 'link')")
+        .bind(resourceId, user.email).first();
+      if (!resource || message.length < 2 || message.length > 5000) return Response.json({ error: "답변은 2~5,000자로 입력해 주세요." }, { status: 400 });
+      const id = crypto.randomUUID();
+      await db.prepare("INSERT INTO resource_messages (id, resource_id, user_email, author_role, body) VALUES (?, ?, ?, 'instructor', ?)")
+        .bind(id, resourceId, user.email, message).run();
+      return Response.json({ ok: true, id, createdAt: new Date().toISOString() });
     }
 
     if (action === "shareProgress") {
