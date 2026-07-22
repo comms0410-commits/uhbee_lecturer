@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { chatGPTSignInPath, getChatGPTUser } from "./chatgpt-auth";
 import { siteDisplayName } from "./display-name";
 import { OnboardingApp } from "./OnboardingApp";
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const requestHeaders = await headers();
   const host = requestHeaders.get("host") ?? "";
+  if (host.split(":")[0].toLowerCase() === "lectureadmin.uhbspro.com") redirect("/admin");
   const isLocal = host.startsWith("localhost") || host.startsWith("127.0.0.1");
   const signedInUser = await getChatGPTUser();
 

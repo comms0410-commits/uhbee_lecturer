@@ -35,6 +35,9 @@ test("defines the complete UhB instructor center", async () => {
   assert.doesNotMatch(app, /이수민 매니저|이메일 보내기|과제 제출|학습하기/);
   assert.match(displayName, /홍길동/);
   assert.match(page, /siteDisplayName/);
+  assert.match(page, /lectureadmin\.uhbspro\.com/);
+  assert.match(app, /lectureadmin\.uhbspro\.com/);
+  assert.match(admin, /lecture\.uhbspro\.com/);
   assert.doesNotMatch(`${app}${page}${layout}${admin}`, /codex-preview|Your site is taking shape|react-loading-skeleton|uhbee1004/i);
 });
 
